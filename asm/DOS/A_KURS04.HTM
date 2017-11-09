@@ -1,0 +1,764 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS, część 4 - Pierwsze programy </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Prev"     hreflang="pl" lang="en" href="a_kurs03.htm">
+<link rel="Next"     hreflang="pl" lang="en" href="a_kurs05.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Kurs języka asembler">
+<META NAME="Keywords" CONTENT="kurs, asm, asembler, assembler, flagi, _pisz_ch, ile_pier">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:47 GMT">
+</HEAD><BODY>
+
+<div class="c">Jak pisać programy w języku asembler?<BR>
+	<h1 class="nag">Część 4 - Pierwsze programy, czyli przełamywanie pierwszych lodów</h1></div>
+
+<P>
+Znamy już rejestry, trochę instrukcji i zasad. No ale teoria jest niczym bez praktyki. Dlatego
+w tej części przedstawię kilka względnie prostych programów, które powinny rozbudzić wyobraźnię
+tworzenia.
+</P>
+<P>Ten program spyta się użytkownika o imię i przywita się z nim:</P>
+	<BR><a href="#a_kurs0400_1" tabindex="1" class="bezdruk">(przeskocz program pytający o imię)</a>
+<PRE title="Program witający się z użytkownikiem po imieniu">
+	; Program witający się z użytkownikiem po imieniu
+	;
+	; Autor: Bogdan D.
+	; kontakt: bogdandr (at) op (dot) pl
+	;
+	; kompilacja:
+	; nasm -f bin -o czesc.com czesc.asm
+	;
+	; kompilacja FASM:
+	; fasm czesc.asm czesc.com
+
+	org 100h
+
+		mov	ah, 9		; funkcja wyświetlania na ekran
+		mov	dx, jak_masz	; co wyświetlić
+		int	21h		; wyświetl
+
+		mov	ah, 0ah	; funkcja pobierania danych z klawiatury
+		mov	dx, imie	; bufor na dane
+		int	21h		; pobierz dane
+
+		mov	ah, 9
+		mov	dx, czesc
+		int	21h		; wyświetl napis &quot;Cześć&quot;
+
+		mov	ah, 9
+		mov	dx, imie+2	; adres wpisanych danych
+		int	21h		; wyświetl wpisane dane
+
+		mov	ax, 4c00h
+		int	21h
+
+	jak_masz	db	&quot;Jak masz na imie? $&quot;
+	imie	db 20		; maksymalna liczba znaków do pobrania
+		db 0		; tu dostaniemy, ile znaków pobrano
+		times 22 db &quot;$&quot;	; miejsce na dane
+
+	czesc		db	10, 13, 10, 13, &quot;Czesc $&quot;</pre>
+
+<P><a name="a_kurs0400_1" id="a_kurs0400_1">Powyższy program</a> korzysta z jeszcze nieomówionej
+ funkcji numer 10 (0Ah) przerwania DOSa. Oto jej opis z listy przerwań
+ Ralfa <span lang="en">Brown</span>'a -
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+	><acronym title="Ralf Brown's Interrupt List" lang="en">RBIL</acronym></A>:</P>
+
+	<BR><a href="#a_kurs0400_2" class="bezdruk">(przeskocz opis int 21h, ah=0ah)</a>
+<PRE lang="en" title="int 21h, ah=0ah">
+	INT 21 - DOS 1+ - BUFFERED INPUT
+		AH = 0Ah
+		DS:DX -> buffer (see #01344)
+	Return: buffer filled with user input
+
+	Format of DOS input buffer:
+	Offset	Size	Description	(Table 01344)
+	 00h	BYTE	maximum characters buffer can hold
+	 01h	BYTE	(call) number of chars from last input which
+	 			may be recalled
+			(ret) number of characters actually read,
+				excluding CR
+	 02h  N BYTEs	actual characters read, including the
+	 			final carriage return</pre>
+
+<P><a name="a_kurs0400_2" id="a_kurs0400_2">Jak widać, korzystanie z niej nie jest trudne.</a>
+ Wystarczy stworzyć tablicę bajtów na znaki
+ czytane z klawiatury. Na początku tablicy podajemy, ile maksymalnie znaków chcemy wczytać.
+ Drugi bajt ustawiamy na zero, by czytać tylko na bieżąco wprowadzane znaki, a nie to, co
+ jeszcze może tkwić w DOS-owym buforze wejściowym.</P>
+<hr>
+<P>
+Kolejny program wypisuje na ekranie rejestr flag w postaci dwójkowej. Zanim mu się
+przyjrzymy, potrzebna będzie nam informacja o funkcji 0Eh przerwania 10h (opis bierzemy
+oczywiście z RBIL):</P>
+
+	<BR><a href="#a_kurs0400" class="bezdruk">(przeskocz opis int 10h, ah=0eh)</a>
+<PRE lang="en" title="int 10h, ah=0eh">
+	INT 10 - VIDEO - TELETYPE OUTPUT
+	        AH = 0Eh
+	        AL = character to write
+	        BH = page number
+	        BL = foreground color (graphics modes only)
+	Return: nothing
+	Desc:   display a character on the screen, advancing the
+		 cursor and scrolling the screen as necessary
+	Notes:  characters 07h (BEL), 08h (BS), 0Ah (LF), and 0Dh (CR)
+		 are interpreted and do the expected things</PRE>
+
+<P><a name="a_kurs0400" id="a_kurs0400">Dla nas zawartość BX nie będzie istotna</a>.
+ A ta funkcja po prostu wypisuje na ekran jakiś znak. No,
+teraz wreszcie możemy przejść do programu. Oto on (flagi.asm):</P>
+	<BR><a href="#a_kurs0401" class="bezdruk">(przeskocz program wypisujący flagi)</a>
+
+<PRE title="program wypisujący flagi">
+; Program wypisujący flagi w postaci dwójkowej
+;
+; Autor: Bogdan D.
+; kontakt:  bogdandr (at) op (dot) pl
+;
+; kompilacja:
+; tasm flagi.asm
+; tlink flagi.obj /t
+
+
+.model tiny		; to będzie mały program
+.code			; tu zaczyna się segment kodu
+.386			; będziemy tu używać rejestrów 32-bitowych.
+			; .386 MUSI być po .code !
+
+org 100h		; to będzie program typu .com
+
+main:			; etykieta jest dowolna, byleby zgadzała się
+			; z tą na końcu
+
+	pushfd		; 32 bity flag idą na stos
+
+	mov ax,0e30h	; AH = 0eh, czyli funkcja wyświetlania,
+			; AL = 30h = kod ASCII cyfry zero
+
+	pop esi		; flagi ze stosu do ESI
+
+	mov cx,32	; tyle bitów i tyle razy trzeba przejść
+			; przez pętlę
+
+petla:			; etykieta oznaczająca początek pętli.
+
+	and al,30h	; upewniamy się, że AL zawiera tylko 30h,
+			; co zaraz się może zmienić. A dokładniej,
+			; czyścimy bity 0-3, z których bit 0 może
+			; się zaraz zmienić
+
+	shl esi,1	; Przesuwamy bity w ESI o 1 w lewo.
+			; 31 bit ESI idzie
+			; do Carry Flag (CF)
+
+	adc al,0	; ADC - add with carry. Do AL dodaj
+			; 0 + wartość CF.
+
+			; jeśli CF (czyli 31 bit ESI) = 1,
+			; to AL := AL+1, inaczej AL bez zmian
+	int 10h		; funkcja 0e, wyświetl znak w AL,
+			; czyli albo zero (30h) albo jedynkę (31h)
+
+	loop petla	; przejdź na początek pętli,
+			; jeśli nie skończyliśmy
+
+	mov ah,4ch	; funkcja wyjścia do DOS
+	int 21h		; wychodzimy
+
+end main		; koniec programu. Ta sama etykieta, co na początku.</PRE>
+
+<hr>
+<P><a name="a_kurs0401" id="a_kurs0401">Wersje NASM i FASM</a>:</P>
+	<BR><a href="#a_kurs0402" class="bezdruk">(przeskocz wersję NASM/FASM programu)</a>
+
+<PRE title="program wypisujący flagi, wersja NASM/FASM">
+; Program wypisujący flagi w postaci dwójkowej
+;
+; Autor: Bogdan D.
+; kontakt:  bogdandr (at) op (dot) pl
+;
+; kompilacja NASM:
+;   nasm -o flagi.com -f bin flagi.asm
+;
+; kompilacja FASM:
+;   fasm flagi.asm flagi.com
+
+
+org 100h		; to będzie program typu .com
+
+main:			; etykieta dowolna, nawet niepotrzebna
+
+	pushfd		; 32 bity flag idą na stos
+
+	mov ax,0e30h	; AH = 0eh, czyli funkcja wyświetlania,
+			; AL = 30h = kod ASCII cyfry zero
+
+	pop esi		; flagi ze stosu do ESI
+
+	mov cx,32	; tyle bitów i tyle razy trzeba przejść
+			; przez pętlę
+
+petla:			; etykieta oznaczająca początek pętli.
+
+	and al,30h	; upewniamy się, że AL zawiera tylko 30h,
+			; co zaraz się może zmienić. A dokładniej,
+			; czyścimy bity 0-3, z których bit 0
+			; może się zaraz zmienić
+
+	shl esi,1	; Przesuwamy bity w ESI o 1 w lewo.
+			; 31 bit ESI idzie do flagi CF
+
+	adc al,0	; ADC - add with carry. Do AL dodaj
+			; 0 + wartość CF.
+			; jeśli CF (czyli 31 bit ESI) = 1,
+			; to AL := AL+1, inaczej AL bez zmian
+
+	int 10h		; funkcja 0e, wyświetl znak w AL,
+			; czyli albo zero (30h) albo jedynkę (31h)
+
+	loop petla	; przejdź na początek pętli,
+			; jeśli nie skończyliśmy
+
+	mov ah,4ch	; funkcja wyjścia do DOS
+	int 21h		; wychodzimy</PRE>
+
+<hr>
+<P><a name="a_kurs0402" id="a_kurs0402">Kompilujemy go następująco</a> (wszystkie programy
+będziemy tak kompilować, chyba że powiem inaczej):</P>
+<PRE>
+	tasm flagi.asm
+	tlink flagi.obj /t</PRE>
+<P>Lub, dla NASMa:</P>
+<PRE>	nasm -o flagi.com -f bin flagi.asm</PRE>
+<P>Lub, dla FASMa:</P>
+<PRE>	fasm flagi.asm flagi.com</PRE>
+
+<P>Nie ma w tym programie wielkiej filozofii. Po prostu 25 bajtów radości...<BR>
+Dociekliwy zapyta, z jakim kodem wyjścia wychodzi ten program. Odpowiedź brzmi oczywiście:<br>
+- Albo 30h albo 31h, w zależności od ostatniego bitu oryginalnych flag.
+</P>
+<hr>
+<P>Teraz krótki programik, którego jedynym celem jest wyświetlenie na ekranie cyfr od 0 do 9,
+każda w osobnej linii:</P>
+	<BR><a href="#a_kurs0403" class="bezdruk">(przeskocz program wyświetlający cyfry)</a>
+<PRE title="program wyświetlający cyfry">
+; tylko wersja NASM/FASM
+;
+; Program wypisuje na ekranie cyfry od 0 do 9
+;
+; kompilacja NASM:
+;   nasm -O999 -o cyfry.com -f bin cyfry.asm
+; kompilacja FASM:
+;   fasm cyfry.asm cyfry.com
+
+; definiujemy stałe:
+
+%define		lf	10	; Line Feed
+%define		cr	13	; Carriage Return
+
+; stałe w wersji FASM:
+;	lf = 10
+;	cr = 13
+
+
+org 100h			; robimy program typu .com
+
+	mov	eax, 0		; pierwsza wypisywana cyfra
+
+wyswietlaj:
+	call	_pisz_ld	; uruchom procedurę wyświetlania
+				; liczby w EAX
+	call	_nwln		; uruchom procedurę, która przechodzi
+				; do nowej linii
+	add	eax, 1		; zwiększamy cyfrę
+	cmp	eax, 10		; sprawdzamy, czy ciągle EAX &lt; 10
+	jb	wyswietlaj	; jeśli EAX &lt; 10, to wyświetlamy
+				; cyfrę na ekranie
+
+	mov	ax, 4c00h	; funkcja wyjścia z programu
+	int	21h		; wychodzimy
+
+
+
+; następujące procedury (wyświetlanie liczby i przechodzenie
+; do nowego wiersza) nie są aż tak istotne, aby omawiać je
+; szczegółowo, gdyż w przyszłości będziemy używać tych samych
+; procedur, ale z biblioteki, a te wstawiłem tutaj dla
+; uproszczenia kompilacji programu.
+
+; Ogólny schemat działania tej procedury wygląda tak:
+; weźmy liczbę EAX=12345. Robimy tak:
+; 1. dzielimy EAX przez 10. reszta = EDX = DL = 5.
+; Zapisz do bufora. EAX = 1234 (iloraz)
+; 2. dzielimy EAX przez 10. reszta = DL = 4.
+; Zapisz do bufora. EAX=123 (iloraz)
+; 3. dzielimy EAX przez 10. reszta = DL = 3.
+; Zapisz do bufora. EAX=12
+; 4. dziel EAX przez 10. DL = 2. zapisz. iloraz = EAX = 1
+; 5. dziel EAX przez 10. DL = 1. zapisz. iloraz = EAX = 0.
+; Przerywamy pętlę.
+; Teraz w buforze są znaki: <q>54321</q>. Wystarczy wypisać
+; wspak i oryginalna liczba pojawia się na ekranie.
+
+
+_pisz_ld:
+
+;pisz32e
+;we: EAX=liczba bez znaku do wypisania
+
+	pushfd			; zachowujemy modyfikowane rejestry
+	push	ecx
+	push	edx
+	push	eax
+	push	esi
+
+	xor si,si		; SI będzie wskaźnikiem do miejsca,
+				; gdzie przechowujemy cyfry.
+				; Teraz SI=0.
+
+	mov ecx,10		; liczba, przez która będziemy dzielić
+
+_pisz_ld_petla:
+	xor edx,edx		; wyzeruj EDX, bo instrukcja DIV
+				; go używa
+	div ecx			; dzielimy EAX przez 10
+
+	mov [_pisz_bufor+si],dl	; do bufora idą reszty z dzielenia
+				; przez 10, czyli cyfry wspak
+
+	inc si			; zwiększ wskaźnik na wolne miejsce.
+				; Przy okazji, SI jest też ilością
+				; cyfr w buforze
+
+	or eax,eax		; sprawdzamy, czy liczba =0
+	jnz _pisz_ld_petla	; jeśli nie, to dalej ją dzielimy
+				; przez 10
+
+	mov ah,0eh		; funkcja wypisywania
+_pisz_ld_wypis:
+	mov al,[_pisz_bufor+si-1]	; wypisujemy reszty wspak
+	or al,&quot;0&quot;	; z wartości 0-9 zrobimy cyfrę &quot;0&quot;-&quot;9&quot;
+	int 10h			; wypisujemy cyfrę
+
+	dec si			; przechodzimy na wcześniejszą cyfrę
+	jnz _pisz_ld_wypis	; jeśli SI=0, to nie ma już cyfr
+
+	pop esi			; przywracamy zmienione rejestry
+	pop eax
+	pop edx
+	pop ecx
+	popfd
+
+	ret			; powrót z procedury
+
+_pisz_bufor:	times	40	db 0	; miejsce na 40 cyferek (bajtów)
+
+_nwln:
+
+;wyświetla znak końca linii (Windows)
+
+	push ax
+	push bp
+	mov ax,(0eh &lt;&lt; 8) | lf		; AX = 0e0ah
+	int 10h				; wyświetlamy znak LF
+	mov al,cr
+	int 10h				; wyświetlamy znak CR
+	pop bp
+	pop ax
+	ret</PRE>
+
+<BR>
+<hr>
+<P><a name="a_kurs0403" id="a_kurs0403">Następny <q>twór</q> nie jest wolno stojącym programem</a>,
+ale pewną procedurą. Pobiera ona informacje z rejestru AL i wypisuje, co trzeba. Oto ona:</P>
+	<BR><a href="#a_kurs0404" class="bezdruk">(przeskocz procedurę _pisz_ch)</a>
+<PRE title="procedura _pisz_ch">
+_pisz_ch:
+
+;we: AL=cyfra heksadecymalna do wypisania 0...15
+; CF=1 jeśli błąd
+
+	push bp		; zachowaj modyfikowane rejestry: BP, AX, Flagi
+	push ax
+	pushf
+
+	cmp al,9		; Sprawdzamy dane wejściowe : AL jest w
+				; 0-9 czy w 10-15?
+	ja _ch_hex		; AL &gt; 9. Skok do _ch_hex
+	or al,30h		; 0 &lt; AL &lt; 9. Or ustawia 2 bity,
+				; czyniąc z AL liczbę z
+				; przedziału 30h - 39h, czyli od &quot;0&quot;
+				; do &quot;9&quot;. Można było napisać
+				; &quot;ADD al,30h&quot;, ale zdecydowałem się
+				; na OR, bo jest szybsze a efekt ten sam.
+
+	jmp short _ch_pz	; AL już poprawione. Skacz do miejsca,
+				; gdzie wypisujemy znak.
+
+_ch_hex:			; AL &gt; 9. Może będzie to cyfra hex,
+				; może nie.
+	cmp al,15		; AL &gt; 15?
+	ja _blad_ch		; jeśli tak, to mamy błąd
+	add al,&quot;A&quot;-10	; Duży skok myślowy. Ale wystarczy to rozbić
+				; na 2 kroki i wszystko staje się jasne.
+				; Najpierw odejmujemy 10 od AL. Zamiast
+				; liczby od 10 do 15 mamy już liczbę
+				; od 0 do 5. Teraz tę liczbę dodajemy do
+				; &quot;A&quot;, czyli kodu ASCII litery A,
+				; otrzymując znak od &quot;A&quot; do &quot;F&quot;
+
+_ch_pz:				; miejsce wypisywania znaków.
+	mov ah,0eh		; numer funkcji: 0Eh
+	int 10h			; wypisz znak
+
+	popf			; zdejmij ze stosu flagi
+	clc			; CF := 0 dla zaznaczenia braku błędu
+				; (patrz opis procedury powyżej)
+	jmp short _ch_ok	; skok do wyjścia
+
+_blad_ch:			; sekcja obsługi błędu (AL &gt; 15)
+	popf			; zdejmij ze stosu flagi
+	stc			; CF := 1 na znak błędu
+
+_ch_ok:				; miejsce wyjścia z procedury
+	pop ax			; zdejmij modyfikowane rejestry
+	pop bp
+
+	ret			; return, powrót</PRE>
+
+<P><a name="a_kurs0404" id="a_kurs0404">To chyba nie było zbyt trudne</a>, co?<BR>
+Szczegóły dotyczące pisania procedur (i bibliotek) znajdują się w moim
+<a href="bibl_tut.htm" hreflang="pl">artykule o pisaniu bibliotek</a>.</P>
+
+<hr>
+<P>Teraz pokażę pewien program, który wybrałem ze względu na dużą liczbę różnych instrukcji i
+sztuczek. Niestety, nie jest on krótki. Ale wspólnie spróbujemy przez niego przejść. Jest to
+wersja dla TASMa, ale obok instrukcji postaram się zamieścić ich NASMowe odpowiedniki.
+Oto on:</P>
+	<BR><a href="#a_kurs0405" class="bezdruk">(przeskocz program zliczający liczby pierwsze)</a>
+<PRE title="program zliczający liczby pierwsze">
+; Program liczy liczby pierwsze w przedziałach
+; 2-10, 2-100, 2-1000,... 2-100.000
+;
+; Autor: Bogdan D.
+; kontakt: bogdandr (at) op (dot) pl
+;
+; kompilacja TASM:
+;   tasm ile_pier.asm
+;   tlink ile_pier.obj /t
+;
+; kompilacja NASM:
+;   nasm -f bin -o ile_pier.com ile_pier.asm
+;
+; kompilacja FASM:
+;   fasm ile_pier.asm ile_pier.com
+
+
+.model tiny		; to będzie mały program. NASM/FASM: usunąć.
+.code			; początek segmentu kodu. NASM:
+			; &quot;section .text&quot; lub nic. FASM: nic
+.386			; będziemy używać rejestrów 32-bitowych.
+			; NASM: &quot;CPU 386&quot; lub nic, FASM: nic
+
+org 100h		; to będzie program typu .com
+
+start:			; początek...
+
+	xor ebx,ebx	; EBX = liczba, którą sprawdzamy, czy jest
+			; pierwsza. Zaczniemy od 3. Poniżej jest 3
+			; razy INC (zwiększ o 1). Najpierw EBX = 0,
+			; bo &quot;XOR rej,rej&quot; zeruje dany rejestr.
+
+	xor edi,edi	; EDI = bieżący licznik liczb pierwszych
+
+	xor ecx,ecx	; ECX = stary licznik liczb (z poprzedniego
+			; przedziału).
+			; Chwilowo, oczywiście 0.
+
+	inc ebx		; EBX = 1
+
+	mov esi,10	; ESI = bieżący koniec przedziału: 10, 100, ..
+
+	inc edi		; EDI = 1. uwzględniamy 2, która jest
+			; liczbą pierwszą
+
+	inc ebx		; EBX = 2, pierwsza liczba będzie = 3
+
+petla:			; pętla przedziału
+
+	cmp ebx,esi	; czy koniec przedziału? (ebx=liczba,
+			; esi=koniec przedziału)
+	jae pisz	; EBX &gt;= ESI - idź do sekcji wypisywania
+			; wyników
+
+	mov ebp,2	; EBP - liczby, przez które będziemy dzielić.
+			; pierwszy dzielnik = 2
+
+	inc ebx		; zwiększamy liczbę. EBX=3. Będzie to
+			; pierwsza sprawdzana.
+
+spr:			; pętla sprawdzania pojedynczej liczby
+
+	mov eax,ebx	; EAX = sprawdzana liczba
+	xor edx,edx	; EDX = 0
+	div ebp		; EAX = EAX/EBP (EDX było=0),
+			; EDX=reszta z dzielenia
+
+	or edx,edx	; instrukcja OR tak jak wiele innych,
+			; ustawi flagę zera ZF na 1, gdy jej wynik
+			; był zerem. W tym przypadku pytamy:
+			; czy EDX jest zerem?
+
+	jz petla	; jeżeli dzieli się bez reszty (reszta=EDX=0),
+			; to nie jest liczbą pierwszą
+			; i należy zwiększyć liczbę sprawdzaną
+			; (inc ebx)
+
+	inc ebp		; zwiększamy dzielnik
+
+	cmp ebp,ebx	; dzielniki aż do liczby
+	jb spr		; liczba &gt; dzielnik - sprawdzaj dalej tę
+			; liczbę. Wiem, że można było sprawdzać tylko
+			; do SQRT(liczba) lub LICZBA/2, ale
+			; wydłużyłoby to program i brakowało mi już
+			; rejestrów...
+
+juz:			; przerobiliśmy wszystkie dzielniki,
+			; zawsze wychodziła reszta,
+			; więc liczba badana jest pierwsza
+
+	inc edi		; zwiększamy licznik liczb znalezionych
+	jmp short petla	; sprawdzaj kolejną liczbę aż do końca
+			; przedziału.
+
+			; sekcja wypisywania informacji
+
+pisz:
+	mov edx,offset przedzial	; NASM/FASM: bez &quot;offset&quot;
+	mov ah,9
+	int 21h		; wypisujemy napis &quot;Przedział 2-....&quot;
+
+	mov eax,esi	; EAX=ESI=koniec przedziału
+	call _pisz_ld	; wypisz ten koniec (EAX)
+
+
+; NASM: mov ax,(0eh &lt;&lt; 8) | &quot;:&quot;	; &lt;&lt; to shift left, | to logiczne OR
+
+	mov ax,(0eh shl 8) or &quot;:&quot; ; to wygląda zbyt skomplikowanie,
+			; ale jest o dziwo prawidłową instrukcją.
+			; Jest tak dlatego, że wyrażenie z prawej
+			; strony jest obliczane przez kompilator.
+			; 0eh przesunięte w lewo o 8 miejsc daje
+			; 0E00 w AX. Dalej, dopisujemy do tego
+			; dwukropek, którego kod ASCII nas nie
+			; interesuje a będzie obliczony przez
+			; kompilator. Ostatecznie, to wyrażenie
+			; zostanie skompilowane jako &quot;mov ax,0e3a&quot;.
+			; Chodzi o to po prostu, aby
+			; nie uczyć się tabeli kodów ASCII na pamięć.
+
+	int 10h		; wypisujemy dwukropek
+
+	add ecx,edi	; dodajemy poprzednią liczbę znalezionych
+			; liczb pierwszych
+	mov eax,ecx	; EAX = liczba liczb pierwszych od 2 do
+			; końca bieżącego przedziału
+
+	call _pisz_ld	; wypisujemy tę liczbę.
+
+
+	mov ah,1	; int 16h, funkcja nr 1: czy w buforze
+			; klawiatury jest znak?
+	int 16h
+	jz dalej	; ZF = 1 oznacza brak znaku. Pracuj dalej.
+	xor ah,ah
+	int 16h		; pobierz ten znak z bufora
+			; (int 16h/ah=1 tego nie robi)
+koniec:
+	mov ax,4c00h
+	int 21h		; wyjdź z programu z kodem wyjścia = 0
+
+dalej:			; nie naciśnięto klawisza
+	cmp esi,100000	; 10^5
+	je koniec	; ESI = 100.000? Tak - koniec, bo dalej
+			; liczy zbyt długo.
+
+	mov eax,esi	; EAX=ESI
+	shl eax,3	; EAX = EAX*8
+	shl esi,1	; ESI=ESI*2
+	add esi,eax	; ESI = ESI*2 + EAX*8 =ESI*2+ESI*8= ESI*10.
+			; Znacznie szybciej niż MUL
+
+	xor edi,edi	; bieżący licznik liczb
+
+	jmp short petla	; robimy od początku...
+
+przedzial	db	10,13,&quot;Przedzial 2-$&quot;
+
+
+; NASM/FASM:
+; _pisz_bufor: times 6 db 0
+_pisz_bufor db 6 dup (0) ; miejsce na cyfry dla następującej procedury:
+
+
+_pisz_ld:
+
+;we: EAX=liczba bez znaku do wypisania
+
+	push ecx		; zachowujemy modyfikowane rejestry
+	push edx
+	push eax
+	push esi
+
+	xor si,si	; SI=0. Będzie wskaźnikiem w powyższy bufor.
+
+	mov ecx,10	; będziemy dzielić przez 10, aby uzyskiwać
+			; kolejne cyfry. Reszty z dzielenia pójdą
+			; do bufora, potem będą wypisane wspak, bo
+			; pierwsza reszta jest przecież cyfrą jedności
+
+_pisz_ld_petla:
+	xor edx,edx	; EDX=0
+
+	div ecx		; EAX=EAX/ECX, EDX = reszta, która mieści się
+			; w DL, bo to jest tylko 1 cyfra dziesiętna
+
+	mov [_pisz_bufor+si],dl	; Cyfra do bufora.
+
+	inc si		; Zwiększ numer komórki w buforze, do której
+			; będziemy teraz pisać
+
+	or eax,eax	; EAX = 0 ?
+
+	jnz _pisz_ld_petla ; Jeśli nie (JNZ), to skok do początku pętli
+
+	mov ah,0eh		; funkcja wypisania
+_pisz_ld_wypis:
+	mov al,[_pisz_bufor+si-1] ; SI wskazuje poza ostatnią cyfrę,
+			; dlatego jest -1. Teraz AL= ostatnia cyfra,
+			; czyli ta najbardziej znacząca w liczbie
+
+		; Zamień liczbę 0-9 w AL na gotową do wypisania cyfrę:
+	or al,&quot;0&quot; ; lub &quot;OR al,30h&quot; lub &quot;ADD al,30h&quot;.
+
+	int 10h			; wypisz AL
+
+	dec si			; zmniejsz wskaźnik do bufora.
+
+	jnz _pisz_ld_wypis	; Jeśli ten wskaźnik (SI) nie jest zerem,
+				; wypisuj dalej
+
+	pop esi			; odzyskaj zachowane rejestry
+	pop eax
+	pop edx
+	pop ecx
+
+	ret			; powrót z procedury
+
+end start			; NASM/FASM: usunąć tę linijkę</PRE>
+
+<P><a name="a_kurs0405" id="a_kurs0405">Kilka uwag o tym programie</a>:</P>
+<UL>
+ <LI>Czemu nie zrobiłem <CODE>MOV EBX,2</CODE> a potem <CODE>INC EBX</CODE>, które musiało być w pętli?<BR>
+	Bo <code>XOR EBX, EBX</code> jest krótsze i szybsze.<BR><BR></LI>
+ <LI>Dobra. Więc czemu nie:
+	<PRE>
+		xor ebx,ebx
+		inc ebx
+		inc ebx	</PRE>
+	<P>Te instrukcje operują na tym samym rejestrze i każda musi poczekać, aż poprzednia się
+	zakończy. Współczesne procesory potrafią wykonywać niezależne czynności równolegle,
+	dlatego wcisnąłem w środek jeszcze kilka niezależnych instrukcji.</P></LI>
+ <LI>Ten program sprawdza za dużo dzielników. Nie można było sprawić, by sprawdzał tylko do na przykład
+	połowy sprawdzanej liczby?<BR>
+	<P>Można było. Używając zmiennych w pamięci. Niechętnie to robię, bo w porównaniu z
+	prędkością operacji procesora, pamięć jest wprost NIEWIARYGODNIE wolna. Zależało mi na
+	szybkości.</P></LI>
+ <LI>Czy zamiast
+	<PRE>		mov ax,(0eh shl 8) or &quot;:&quot;	</PRE>
+	nie prościej byłoby zapisać
+	<PRE>
+		mov ah,0eh
+		mov al,&quot;:&quot;	; lub 3ah	</PRE>
+
+	<P>Jasne, że byłoby prościej... zrozumieć. Ale nie wykonać dla procesora. Jedną instrukcję
+	wykonuje się szybciej niż 2 i to jeszcze pośrednio operujące na tym samym rejestrze (AX).
+	</P></LI>
+ <LI> Czy nie prościej zamiast tych wszystkich <code>SHL</code> zapisać jedno
+	<code>MUL</code> lub <code>IMUL</code>?<BR>
+	<P>Jasne, że prościej. Przy okazji dobre kilka[naście] razy wolniej.</P></LI>
+
+ <LI>Dlaczego ciągle <CODE>XOR rej,rej</CODE>?<BR>
+	<P>Szybsze niż <CODE>MOV rej,0</CODE>, gdzie to zero musi być często zapisane
+	 4 bajtami zerowymi. Tak więc i krótsze. Oprócz tego, dzięki instrukcji <code>XOR</code>
+	lub <code>SUB</code> wykonanej na tym samym rejestrze, procesor wie, że ten rejestr już
+	jest pusty. Może to przyśpieszyć niektóre operacje.
+	</P></LI>
+
+ <LI>Dlaczego na niektórych etykietach są jakieś znaki podkreślenia z przodu?<BR>
+	<P>Niektóre procedury są żywcem wyjęte z mojej biblioteki, pisząc którą musiałem zadbać, by
+	przypadkowo nazwa jakieś mojej procedury nie była identyczna z nazwą jakiejś innej
+	napisanej w programie korzystającym z biblioteki.<BR>
+	Czy nie mogłem tego potem zmienić?<BR>
+	Jasne, że mogłem. Ale nie było takiej potrzeby.</P></LI>
+ <LI>Czemu <CODE>OR rej,rej</CODE> a nie <CODE>CMP rej,0</CODE>?<BR>
+	<P>OR jest krótsze i szybsze. Można też używać <CODE>TEST rej,rej</CODE>, które nie zmienia
+	zawartości rejestru.</P></LI>
+ <LI>Czemu <CODE>OR al, &quot;0&quot;</CODE>?<BR>
+	<P>Bardziej czytelne niż <CODE>ADD/OR al,30h</CODE>. Chodzi o to, aby dodać kod ASCII zera. I można
+	to zrobić bardziej lub mniej czytelnie.</P></LI>
+<!--
+ <LI>Po co te śmieszne gwiazdki i znaki równości w komentarzach?<BR>
+	<P>Gdy program się rozrasta, pozwalają utrzymać czytelność. Takich linijek używam do
+	oddzielania różnych procedur/sekcji kodu.</P></LI>
+-->
+</UL>
+<P>Wiem, że ten program nie jest doskonały. Ale taki już po prostu napisałem...<BR>
+Nie martwcie się, jeśli czegoś od razu nie zrozumiecie. Naprawdę, z czasem samo przyjdzie.
+Ja też przecież nie umiałem wszystkiego od razu.</P>
+
+<P>Inny program do liczb pierwszych znajdziecie tu: <a href="asm/inni/prime.txt">prime.txt</a>.
+</P>
+<P>Następnym razem coś o ułamkach i koprocesorze.</P>
+
+<blockquote>Podstawowe prawo logiki:<BR>
+ Jeżeli wiesz, że nic nie wiesz, to nic nie wiesz.<BR>
+  Jeżeli wiesz, że nic nie wiesz, to coś wiesz.<BR>
+  Więc nie wiesz, że nic nie wiesz. </blockquote>
+
+<br><br>
+<div class="bezdruk">
+<a accesskey="3" hreflang="pl" href="a_kurs03.htm">Poprzednia część kursu</a> (Alt+3)<BR>
+<a accesskey="4" hreflang="pl" href="a_kurs05.htm">Kolejna część kursu</a> (Alt+4)<br>
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+<BR><HR>
+<h2 class="nag">Ćwiczenia</h2>
+ (można korzystać z zamieszczonych tu procedur)
+<OL>
+ <LI>Napisz program, który na ekranie wyświetli liczby od 90 do 100.<BR><BR></LI>
+ <LI>Napisz program sprawdzający, czy dana liczba (umieścisz ją w kodzie, nie musi być
+	wczytywana znikąd) jest liczbą pierwszą.<BR><BR></LI>
+ <LI>Napisz program wypisujący dzielniki danej liczby (liczba też w kodzie).</LI>
+
+</OL>
+
+</BODY></HTML>

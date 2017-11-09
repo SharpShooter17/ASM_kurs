@@ -1,0 +1,136 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Dynamiczna alokacja pamięci</TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Dynamiczna alokacja pamięci">
+<META NAME="Keywords" CONTENT="asm, assembler, asembler, DOS, alokacja pamięci, alloc, malloc">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Dynamiczna alokacja pamięci</h1>
+<P>
+Już w średnio zaawansowanych programach pojawia się potrzeba dynamicznego rezerwowania pamięci. Na
+ przykład, użytkownik podaje nam rozmiar tablicy a my musimy taką tablicę utworzyć i na niej operować
+ (nie znając wcześniej nawet maksymalnego jej rozmiaru). Rozwiązaniem takich problemów jest
+ właśnie dynamiczna alokacja pamięci.</P>
+<P>
+Pod DOSem pamięć alokuje się funkcją AH=48h przerwania 21h, w BX
+ podając liczbę paragrafów do zaalokowania (1 paragraf = 16 bajtów). Jeśli alokacja pamięci się
+ powiedzie, w AX otrzymujemy numer segmentu z zarezerwowaną dla nas pamięcią. Programy typu .com
+ z założenia zajmują całą dostępną pamięć, więc aby coś zaalokować, należy najpierw trochę
+ pamięci zwolnić.
+</P>
+<P>
+Zwalnianie pamięci wykonuje się funkcją 49h, w ES podając numer segmentu do zwolnienia.
+</P>
+<P>
+Jak widać, teoria nie jest skomplikowana. Przejdźmy więc może do przykładu. Ten krótki programik
+ ma za zadanie zaalokować 160 bajtów, wyzerować je i na końcu zwolnić.</P>
+
+	<BR><a href="#alloctut01" tabindex="1" class="bezdruk">(przeskocz program)</a>
+<PRE title="program ilustrujący dynamiczną alokację pamięci">
+; Dynamiczna alokacja pamięci pod DOSem
+;
+; Autor: Bogdan D., bogdandr (at) op.pl
+;
+; kompilacja:
+;
+; nasm -f obj -o allocdos.obj allocdos.asm
+; val allocdos.obj,allocdos.exe,,,
+
+section	.text
+
+..start:
+	mov	ah, 49h
+	mov	es, [ds:2ch]	; ES=segment naszych zmiennych środowiskowych
+	int	21h		; zwalniamy
+
+	mov	ax, seg info
+	mov	ds, ax		; DS = nasz segment danych (w razie czego)
+
+	mov	ah, 48h		; rezerwuj pamięć
+	mov	bx, 10		; 10 paragrafów
+	int	21h
+	jc	problem		; CF=1 oznacza błąd
+
+	mov	es, ax		; ES = przydzielony segment
+
+	mov	ah, 9
+	mov	dx, info
+	int	21h		; wyświetl pierwszy napis
+
+	mov	cx, 160		; tyle bajtów wyzerujemy
+	xor	di, di		; poczynając od adresu 0 w nowym segmencie
+	xor	al, al		; AL = 0
+	cld			; kierunek: do przodu
+	rep	stosb		; zerujemy obszar
+
+	mov	ah, 49h
+	int	21h		; zwalniamy pamięć
+	jc	problem
+
+
+	mov	ah, 9
+	mov	dx, info2
+	int	21h
+
+problem:
+	mov	ax, 4c00h
+	int	21h
+
+koniec:
+
+section	.data
+
+info	db	&quot;Udana alokacja pamieci.&quot;,10,13,&quot;$&quot;
+info2	db	&quot;Udane zwolnienie pamieci.&quot;,10,13,&quot;$&quot;
+
+; program typu .exe musi mieć zadeklarowany stos
+section stack stack
+	resb 400h</PRE>
+
+<P><a name="alloctut01" id="alloctut01">Zwalnianie pamięci w programach typu .com</a>
+ polega na zmianie rozmiaru segmentu kodu.
+ Wykonuje się to funkcją AH=4Ah przerwania 21h, w ES podając segment, którego rozmiar
+ chcemy zmienić (nasz segment kodu - CS), a w BX - nowy rozmiar w paragrafach.<BR>
+Typowy kod wygląda więc tak:</P>
+
+<PRE>
+	mov	ax, cs
+	mov	es, ax		; będziemy zmieniać rozmiar segmentu kodu
+	mov	bx, koniec	; BX = rozmiar segmentu kodu
+	shr	bx, 4		; BX /= 16 - rozmiar w paragrafach
+	inc	bx		; +1, żeby nie obciąć naszego programu
+	mov	ah, 4ah		; funkcja zmiany rozmiaru
+	int	21h</PRE>
+
+<P><em class="wazne">UWAGA: Etykieta <q>koniec</q> musi być ostatnim elementem w kodzie programu.</em></P>
+
+<P>
+Jeśli potrzeba więcej pamięci, niż DOS może nam zaoferować, można
+wykorzystać pamięć <acronym title="Expanded Memory Specification" lang="en">EMS</acronym> lub
+<acronym title="Extended Memory Specification" lang="en">XMS</acronym>, o czym piszę w moim
+<a href="emsxms.htm" hreflang="pl">mini-kursie o korzystaniu z EMS i XMS</a>.
+</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

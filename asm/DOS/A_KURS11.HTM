@@ -1,0 +1,441 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS, część 11 - Pliki </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Prev"     hreflang="pl" lang="en" href="a_kurs10.htm">
+<link rel="Next"     hreflang="pl" lang="en" href="a_kurs12.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Kurs języka asembler">
+<META NAME="Keywords" CONTENT="kurs, asm, asembler, assembler, pliki">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<div class="c">Jak pisać programy w języku asembler?<BR>
+	<h1 class="nag">Część 11 - Pamięć jest nietrwała, czyli jak posługiwać się plikami</h1></div>
+
+<P>
+Jak wiemy, wszystkich danych nie zmieścimy w pamięci. A nawet jeśli zmieścimy, to pozostaną
+tam tylko do najbliższego wyłączenia prądu.
+ Dlatego trzeba je zapisywać do pliku, a
+potem umieć je z tego pliku odczytać. W tej części zajmiemy się właśnie operacjami na plikach.
+</P>
+<P>
+Do operowania na plikach posłużymy się kilkoma funkcjami przerwania 21h:</P>
+<UL>
+ <LI>AH = <span class="b">3Ch</span> - utworzenie pliku (wymazanie, gdy już istnieje).<br>
+ 	<P>W rejestrze CX podajemy atrybuty
+	pliku (ustawiony bit 0 oznacza plik tylko do odczytu, bit 1 - czy plik ma być ukryty,
+	bit 2 - plik systemowy, 3 - etykieta woluminu, 4 - zawsze zero, 5 - plik archiwalny),
+	a DS:DX wskazuje na nazwę pliku.<BR>
+	<em class="wazne">UWAGA: Nazwa musi być zakończona bajtem zerowym</em><BR>
+	Niewypełnienie powyższego warunku jest przyczyną wielu błędów w programach.<BR>
+	W rejestrze AX otrzymujemy <q>uchwyt do pliku</q> (<span lang="en">file handle</span>)
+	 - specjalną wartość przydzielaną nam przy otwieraniu pliku.
+	</P></LI>
+
+ <LI>AH = <span class="b">3Dh</span> - otworzenie istniejącego pliku.<br>
+ 	<P>W rejestrze AL podajemy tryb dostępu,
+	DS:DX wskazuje na nazwę pliku.<BR>
+	Tryby dostępu określa się następującymi bitami w AL (pomijam nieistotne informacje,
+	całość możecie znaleźć w <A
+	HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+	><acronym lang="en" title="Ralf Brown's Interrupt List">RBIL</acronym></A>):</P>
+	<pre>
+	Bit	Opis
+	2-0	tryb dostępu
+		000 tylko do odczytu
+		001 tylko do zapisu
+		010 odczyt i zapis
+	3	zarezerwowany, musi być 0
+	6-4	tryb współdzielenia (DOS 3.0+)
+		000 tryb zgodności
+		001 <span lang="en">DENYALL</span> - zabroń innym odczytu i zapisu
+		010 <span lang="en">DENYWRITE</span> - zabroń innym zapisu
+		011 <span lang="en">DENYREAD</span> - zabroń innym odczytu
+		100 <span lang="en">DENYNONE</span> - niczego nie zabraniaj
+	7	dziedziczenie
+		Jeśli ten bit jest ustawiony, plik jest prywatny dla bieżącego procesu
+		i nie będzie dziedziczony przez procesy potomne	</pre>
+	<P><em class="wazne">UWAGA: Nazwa musi być zakończona bajtem zerowym</em><BR>
+	W rejestrze AX otrzymujemy <q>uchwyt do pliku</q> (<span lang="en">file handle</span>)
+	 - specjalną wartość przydzielaną nam przy otwieraniu pliku.
+	</P></LI>
+
+ <LI>AH = <span class="b">3Eh</span> - zamknięcie otwartego pliku.<br>
+ 	<P>W rejestrze BX podajemy uchwyt do pliku.
+	</P></LI>
+
+ <LI>AH = <span class="b">3Fh</span> - odczyt z pliku.<br>
+ 	<P>W rejestrze BX podajemy uchwyt do pliku, w CX - liczba bajtów do
+	odczytania, DS:DX wskazuje na miejsce, dokąd będziemy zapisywać.
+	</P></LI>
+
+ <LI>AH = <span class="b">40h</span> - zapis do pliku.<br>
+ 	<P>W rejestrze BX podajemy uchwyt do pliku, w CX - liczba bajtów do
+	zapisania, DS:DX wskazuje na miejsce, z którego będziemy czytać dane do zapisania.
+	</P></LI>
+
+ <LI>AH = <span class="b">42h</span> - przechodzenie na określoną pozycję w pliku.<br>
+ 	<P>Rejestr AL mówi DOSowi, skąd wyruszamy:
+	0 - z początku pliku, 1 - z bieżącej pozycji, 2 - z końca pliku. BX = uchwyt pliku,
+	CX : DX - odległość, o którą się przesuwamy (może być ujemna).
+	</P></LI>
+
+ <LI>AH = <span class="b">41h</span> - usuwanie pliku.<br>
+ 	<P>DS:DX wskazuje na nazwę pliku.<BR>
+	<em class="wazne">UWAGA: Nazwa musi być zakończona bajtem zerowym</em>
+	</P></LI>
+</UL>
+<P>Wszystkie te funkcje ustawiają flagę <span lang="en">carry</span> (CF=1), gdy wystąpił jakiś błąd.<BR>
+Po szczegóły (w tym kody błędów) odsyłam do
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+	>Listy Przerwań Ralfa <span lang="en">Brown</span>'a</A>.</P>
+
+<P>
+Przykładowe użycie tych funkcji:</P>
+	<BR><a href="#a_kurs1101" tabindex="1" class="bezdruk">(przeskocz przykłady)</a>
+<br>
+Utworzenie pliku i zapisanie czegoś do niego:
+<PRE title="przykłady">
+	mov	ah, 3ch		; numer funkcji - utworzenie
+	mov	dx, nazwa	; adres nazwy pliku
+	xor	cx, cx		; atrybuty. Zero oznacza normalny plik.
+	int	21h		; utworzenie pliku
+	jc	blad		; sprawdzamy, czy nie ma błędu.
+
+	mov	[uchwyt], ax
+	mov	bx, ax		; zapisujemy uchwyt
+
+	mov	ah, 40h		; numer funkcji - zapis
+				; BX = uchwyt do pliku
+	mov	cx, 1024	; liczba bajtów do zapisania
+	mov	dx, bufor	; adres bufora, z którego bierzemy bajty
+	int	21h		; zapis do pliku
+	jc	blad		; sprawdzamy, czy nie ma błędu.
+
+	mov	ah, 3eh		; numer funkcji - zamknięcie pliku
+				; BX = uchwyt do pliku
+	int	21h		; zamykamy plik
+	jc	blad		; sprawdzamy, czy nie ma błędu.</PRE>
+
+<P>Otwarcie istniejącego pliku, odczytanie i zapisanie czegoś do niego:</P>
+	<pre>
+	mov	ah, 3dh		; numer funkcji - otwieranie pliku
+	mov	al, 00010010b	; wyłączny dostęp do odczytu i zapisu
+	mov	dx, nazwa	; adres nazwy pliku
+	int	21h		; utworzenie pliku
+	jc	blad		; sprawdzamy, czy nie ma błędu.
+
+	mov	[uchwyt], ax
+	mov	bx, ax		; zapisujemy uchwyt
+
+	mov	ah, 3fh		; numer funkcji - odczyt
+				; BX = uchwyt do pliku
+	mov	cx, 1024	; liczba bajtów do odczytania
+	mov	dx, bufor	; adres bufora, do którego czytamy
+	int	21h		; czytamy z pliku
+	jc	blad		; sprawdzamy, czy nie ma błędu.
+
+	; .... operacje na bajtach z pliku, na przykład
+	xor	byte [bufor], 0ffh
+
+	mov	ah, 40h		; numer funkcji - zapis
+				; BX = uchwyt do pliku
+	mov	cx, 1024	; liczba bajtów do zapisania
+	mov	dx, bufor	; adres bufora, z którego bierzemy bajty
+	int	21h		; zapis do pliku
+	jc	blad		; sprawdzamy, czy nie ma błędu.
+
+	; Zauważcie, że zapisane bajty wylądowały po odczytanych, gdyż nie
+	; zmieniliśmy pozycji w pliku, a ostatnia operacja (odczyt) zostawiła
+	; ją tuż po odczytanych bajtach
+
+	mov	ah, 3eh		; numer funkcji - zamknięcie pliku
+				; BX = uchwyt do pliku
+	int	21h		; zamykamy plik
+	jc	blad		; sprawdzamy, czy nie ma błędu.</PRE>
+
+
+<BR>
+<P><a name="a_kurs1101" id="a_kurs1101">A teraz <q>prawdziwy</q> przykład</a>.
+ Będzie to nieco uszczuplona (pominąłem wczytywanie nazwy pliku)
+wersja mojego programu <q>na_male.asm</q>. Program ten zamienia wszystkie wielkie litery w podanym
+pliku na ich małe odpowiedniki. Reszta znaków pozostaje bez zmian. Jedna rzecz jest warta
+uwagi - nigdzie nie zmieniam rejestru BX, więc ciągle w nim jest uchwyt do pliku i nie muszę
+tego uchwytu zapisywać do pamięci.<BR>
+A teraz kod:</P>
+	<BR><a href="#a_kurs1102" class="bezdruk">(przeskocz na_male.asm)</a>
+<PRE title="na_male.asm">
+; Program zamienia wszystkie litery w podanym pliku z wielkich na male.
+;
+; Autor: Bogdan D.
+; kontakt: bogdandr (at) op (dot) pl
+;
+; nasm -O999 -o na_male.com -f bin na_male.asm
+; fasm na_male.asm na_male.com
+
+org 100h
+
+start:
+	mov	dx, info
+	mov	ah, 9
+	int	21h
+
+	mov	ax, 3d02h	; otwórz do odczytu i zapisu,
+				; zabroń wszystkim dostępu
+	mov	dx, plik	; adres nazwy pliku
+	int	21h
+
+	jnc	otw_ok
+	call	plik_blad	; uruchamiamy tę procedurę, gdy wystąpił błąd
+	jmp	zamk_ok		; jeśli nie udało się nam nawet otworzyć
+				; pliku, to od razu wychodzimy z programu.
+
+
+otw_ok:
+	mov	bx, ax		; zapisujemy uchwyt do pliku
+	mov	bp, 400h	; BP = rozmiar bufora.
+
+czytaj:
+	mov	ah, 3fh		; funkcja czytania
+				; BX = uchwyt
+	mov	dx, bufor	; adres bufora, dokąd czytamy
+	mov	cx, bp		; kilobajt - rozmiar bufora
+	int	21h		; odczyt
+
+	jnc	czyt_ok
+	call	plik_blad	; uruchamiamy tę procedurę, gdy wystąpił błąd
+
+czyt_ok:
+	xor	di, di		; DI będzie wskaźnikiem do bufora.
+				; Na początku go zerujemy.
+	cmp	ax, cx		; Czy liczba bajtów odczytana (AX) =
+				; = liczba żądana (CX) ?
+	jne	przy_eof	; jeśli nie, to plik się skończył
+
+zamiana:
+	mov	dl, [bufor+di]	; wczytujemy znak z bufora do DL
+
+	cmp	dl, &quot;A&quot;
+	jb	znak_ok
+	cmp	dl, &quot;Z&quot;
+	ja	znak_ok
+
+	or	dl, 20h		; jeśli okazał się wielką literą, zamieniamy
+				; go na małą
+	mov	[bufor+di], dl	; i zapisujemy w miejsce,
+				; gdzie poprzednio był
+
+znak_ok:
+	inc	di		; przechodzimy do innych znaków
+	loop	zamiana		; aż przejdziemy przez cały bufor
+				; (CX=BP=400h)
+
+	mov	dx, ax		; DX = liczba przeczytanych bajtów
+	mov	ax, 4201h	; idź do ... od pozycji bieżącej.
+				; aby zapisać zmienione litery,
+				; musimy przejść
+				; się w pliku o 1 kilobajt wstecz.
+				; Do CX:DX wpisujemy odległość
+	neg	dx		; DX = -DX
+;	dec	cx		; CX po wyjściu z pętli jest zerem,
+				; więc wykonanie DEC zrobi z niego -1.
+	mov	cx, 0ffffh	; CX = -1
+				; CX:DX = -DX = -liczba przeczytanych bajtów
+
+				; BX = uchwyt
+	int	21h		; wykonujemy przeskok w pliku
+
+	jnc	idz_ok
+	call	plik_blad
+
+idz_ok:				; po udanym przeskoku
+
+	mov	dx, bufor	; DX = adres bufora, skąd będziemy brać dane
+				; do zapisania
+				; BX = uchwyt
+	mov	ah, 40h		; funkcja zapisz
+	mov	cx, bp		; CX = BP = 400h = długość bufora.
+	int	21h		; zapisujemy
+
+	jmp	short czytaj	; i idziemy czytać nową partię danych.
+
+przy_eof:			; gdy jesteśmy już przy końcu pliku.
+
+;	xor	di, di		; DI już = 0 (wcześniej to zrobiliśmy)
+
+	mov	bp, ax		; BP = liczba przeczytanych znaków
+	mov	cx, ax		; CX = liczba przeczytanych znaków
+
+zamiana2:
+	mov	dl, [bufor+di]	; pobieramy znak z bufora do DL
+
+	cmp	dl, &quot;A&quot;
+	jb	znak_ok2
+	cmp	dl, &quot;Z&quot;
+	ja	znak_ok2
+
+	or	dl, 20h		; jeśli okazał się wielką literą,
+				; zamieniamy go na małą
+	mov	[bufor+di], dl	; i zapisujemy w miejsce,
+				; gdzie poprzednio był
+
+znak_ok2:
+	inc	di		; przechodzimy do innych znaków
+	loop	zamiana2	; aż przejdziemy przez cały bufor
+				; (CX = BP = liczba bajtów)
+
+	mov	dx, bp
+;	dec	cx		; CX po wyjściu z pętli jest zerem, więc
+				; wykonanie DEC zrobi z niego -1.
+	mov	cx, 0ffffh	; CX = -1
+				; CX:DX = -DX
+	mov	ax, 4201h	; idź do ... od pozycji bieżącej.
+	neg	dx		; DX = -DX.
+				; CX:DX = -DX = -liczba przeczytanych bajtów
+
+				; BX = uchwyt
+	int	21h		; wykonujemy przeskok w pliku
+
+	jnc	idz_ok2
+	call	plik_blad
+
+idz_ok2:			; po udanym przeskoku
+
+	mov	dx, bufor	; zapiszemy do pliku resztę danych.
+				; DX = adres bufora.
+				; BX = uchwyt
+	mov	cx, bp		; CX = liczba bajtów uprzednio odczytanych
+	mov	ah, 40h		; funkcja zapisu do pliku
+	int	21h		; zapisujemy
+
+	jnc	zamk		; gdy nie ma błędu, to zamkniemy plik
+	call	plik_blad
+
+zamk:
+	mov	ah, 3eh
+				; BX = uchwyt
+	int	21h		; zamykamy nasz plik
+	jnc	zamk_ok
+	call	plik_blad
+
+zamk_ok:
+	mov	ax, 4c00h
+	int	21h		; wyjście...
+
+
+plik_blad:			; procedura wyświetla informację o tym, że
+				; wystąpił błąd i wypisuje numer tego błędu
+	push	ax
+	push	bx
+
+	mov	dx, blad_plik
+	mov	bx, ax
+	mov	ah, 9
+	int	21h
+
+	mov	ax, bx
+	call	pl
+
+	pop	bx
+	pop	ax
+
+	ret
+
+pl:                   	; procedura wypisuje liczbę (4 znaki szesnastkowe)
+
+	mov	bx, ax
+	shr	ax, 12
+	call	pc2
+
+	mov	al, bh
+	and	al, 0fh
+	call	pc2
+
+	mov	al, bl
+	shr	al, 4
+	and	al, 0fh
+	call	pc2
+
+	mov	al, bl
+	and	al, 0fh
+	call	pc2
+
+	ret
+
+pc2:
+;we: AL - cyfra hex
+;wy: wyświetla cyfrę, niszczone ax
+
+	cmp	al, 9
+	mov	ah, 0eh
+	ja	hex
+	or	al, &quot;0&quot;
+	jmp	short pz
+hex:
+	add	al, &quot;A&quot;-10
+pz:
+	int	10h
+
+	ret
+
+bufor: 		times 400h db 0		; bufor wielkości jednego kilobajta
+;plik: 		times 80 db 0
+plik		db &quot;aaa.txt&quot;,0		; nazwa pliku
+
+info db &quot;Program zamienia wielkie litery w pliku na male.&quot;,10,13,&quot;$&quot;
+input1		db &quot;Podaj nazwe pliku do przetworzenia: $&quot;
+zla_nazwa 	db 10,13,&quot;Zla nazwa pliku.$&quot;
+blad_plik 	db 10,13,&quot;Blad operacji na pliku. Kod: $&quot;</PRE>
+
+<P><a name="a_kurs1102" id="a_kurs1102">Ten program chyba nie był za trudny, prawda?</a>
+ Cała treść skupia się na odczytaniu paczki bajtów,
+ewentualnej ich podmianie i zapisaniu ich w to samo miejsce, gdzie były wcześniej.</P>
+
+<P>
+Pliki są podstawowym sposobem przechowywania danych. Myślę więc, że się ze mną zgodzicie, iż
+opanowanie ich obsługi jest ważne i nie jest to aż tak trudne, jakby się mogło wydawać.</P>
+
+<br>
+<div class="bezdruk">
+<a accesskey="3" hreflang="pl" href="a_kurs10.htm">Poprzednia część kursu</a> (Alt+3)<BR>
+<a accesskey="4" hreflang="pl" href="a_kurs12.htm">Kolejna część kursu</a> (Alt+4)<br>
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+
+<BR><BR><HR>
+<h2 class="nag">Ćwiczenia</h2>
+<OL>
+ <LI>Napisz program, który wykona po kolei następujące czynności:
+  <OL class="alfa">
+   <LI>Utworzy nowy plik</LI>
+   <LI>Zapisze do niego 256 bajtów o wartościach od 00 do FF (nie musicie zapisywać po 1 bajcie)</LI>
+   <LI>Zamknie ten plik</LI>
+   <LI>Otworzy ponownie ten sam plik</LI>
+   <LI>Zapisze odczytane bajty w nowej tablicy 256 słów w taki sposób:
+	<PRE>
+		00 00 00 01 00 02 00 03 00 04 .... 00 FD 00 FE 00 FF	</PRE>
+	czyli każdy oddzielony bajtem zerowym (należy przeczytać wszystkie bajty, po czym ręcznie
+	je przenieść gdzie indziej i <q>wzbogacić</q>)</LI>
+   <LI>Zamknie otwarty plik</LI>
+   <LI>Usunie ten plik</LI>
+  </OL>
+ </LI>
+</OL>
+
+</BODY></HTML>

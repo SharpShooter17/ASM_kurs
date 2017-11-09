@@ -1,0 +1,465 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Wykrywanie sprzętu </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Wykrywanie sprzętu">
+<META NAME="Keywords" CONTENT="asm, assembler, asembler, DOS, sprzęt, hardware, LPT, COM, RAM">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite/Kate; www.kate-editor.org">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Wykrywanie sprzętu</h1>
+
+<P>
+Niektóre programy nie tylko zajmują się przetwarzaniem danych, ale muszą też współpracować
+ze sprzętem, na przykład wykorzystać port szeregowy czy równoległy do przesyłania danych
+(czy to na drukarkę, czy do innego urządzenia). W tym artykule pokażę, jak wykrywać
+część urządzeń zainstalowanych w komputerze. Dobrze mieć <A
+HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+>spis przerwań Ralfa <span lang="en">Brown</span>'a</a> pod ręką.</P>
+
+
+
+
+
+<BR><HR>
+<h2 class="nag">Wykrywanie ilości zainstalowanej pamięci <acronym lang="en"
+	title="Random Access Memory">RAM</acronym></h2>
+
+	<BR><a href="#hw_tut01" tabindex="1" class="bezdruk">(przeskocz wykrywanie pamięci)</a>
+<P>
+<em class="wazne">UWAGA</em>: NIE należy badać pamięci RAM, zapisując do niej
+określone bity pod każdy możliwy adres i sprawdzając, czy uda się odczytać te same bity
+(brak pamięci sygnalizowany jest odczytaniem FF). Część urządzeń w komputerze (zwłaszcza PCI)
+jest mapowana do pamięci i zapisywanie do pewnych obszarów jest równoznaczne z zapisywaniem
+do tych urządzeń, co może je poważnie uszkodzić!
+</P>
+<P>
+Do odkrycia zainstalowanej ilości pamięci RAM można skorzystać z następujących funkcji
+<acronym lang="en" title="Basic Input/Output System">BIOS</acronym>u:
+int 15h z EAX=0e820h, int 15h z EAX=0000E820h oraz int 12h (najlepiej w tej kolejności).
+</P>
+<P>
+Pierwsza z nich korzysta z 32-bitowych rejestrów, więc dopiero od procesora 386 można
+sprawdzać, czy jest dostępna. Kolejne uruchomienia tej funkcji zwracają informacje o
+kolejnych obszarach pamięci i ich typie, tworząc tym samym BIOSową mapę pamięci.
+Ta funkcja przyjmuje następujące argumenty:</P>
+<ul>
+ <li>EAX = 0000E820h</li>
+ <li>EDX = 534D4150h (stała)</li>
+ <li>ES:DI - adres bufora o następującej strukturze:<br>
+  <ul>
+   <li>8 bajtów na adres obszaru pamięci</li>
+   <li>8 bajtów na długość tego obszaru pamięci</li>
+   <li>4 bajty na typ obszaru pamięci</li>
+  </ul></li>
+ <li>ECX - długość bufora spod ES:DI w bajtach (minimum to 20)</li>
+ <li>EBX = adres początkowy, od którego BIOS ma zacząć sprawdzanie. Na początku jest to zero.</li>
+</ul>
+<P>Jeśli wywołanie się powiedzie, funkcja zwraca, co następuje:</P>
+<ul>
+ <li>flaga CF=0</li>
+ <li>wskazany bufor zostaje wypełniony danymi</li>
+ <li>EBX = następny adres, skąd kopiować (podajemy go w EBX jako początkowy do kolejnego wywołania)
+  lub 00000000h jeśli koniec</li>
+ <li>ECX = długość zwróconych informacji w bajtach</li>
+</ul>
+<P>W przypadku niepowodzenia flaga CF=1. Przykładowe wywołanie wygląda tak:</P>
+<pre>
+	mov	ax, cs
+	mov	es, ax		; jeśli bufor jest w sekcji kodu
+	mov	eax, 0e820h
+	mov	edx, 534D4150h
+	xor	ebx, ebx
+	mov	ecx, 20
+	mov	di, bufor
+	int	15h
+	jc	blad
+
+	; tu operujemy na danych
+
+blad:
+...
+
+bufor:
+b_adres		dd 0, 0
+b_dlugosc	dd 0, 0
+b_typ		dd 0</pre>
+
+<P>
+Druga funkcja nie przyjmuje żadnych argumentów (poza numerem funkcji w AX) i zwraca ilość
+pamięci rozszerzonej od 1 MB do 16 MB, w kilobajtach, w AX. Jeśli wywołanie się nie powiedzie,
+flaga CF=1. Przykładowe wywołanie wygląda tak:</P>
+<pre>
+	mov	ax, 0E801h
+	int	15h
+	jc	blad
+
+	; tu operujemy na danych
+
+blad:
+</pre>
+
+<P>
+Trzecia funkcja (przerwanie int 12h) w ogóle nie przyjmuje żadnych argumentów,
+a zwraca liczbę kilobajtów ciągłej pamięci od bezwzględnego adresu 00000h.</P>
+
+
+
+
+
+
+<BR><HR>
+<h2 class="nag"><a name="hw_tut01" id="hw_tut01">Wykrywanie portów szeregowych
+	i równoległych</a></h2>
+
+	<BR><a href="#hw_tut02" class="bezdruk">(przeskocz wykrywanie portów)</a>
+<P>
+Wykrywanie portów, o których wie BIOS, jest bardzo łatwe. Wystarczy zajrzeć do BDA
+(<span lang="en">BIOS Data Area</span>), czyli segmentu numer 40h, zawierającego dane BIOSu.<br>
+Adresy kolejnych portów szeregowych (maksymalnie czterech) jako 16-bitowe słowa
+można znaleźć pod adresami 0040h:0000h, 0040h:0002h, 0040h:0004h, 0040h:0006h (choć ten
+ostatni adres może służyć do innych celów na nowszych komputerach), zaś adresy
+kolejnych portów równoległych (maksymalnie czterech) jako 16-bitowe słowa znajdują się pod
+adresami 0040h:0008h, 0040h:000Ah, 0040h:000Ch, 0040h:000Eh.
+</P>
+<P>
+Jeśli dodatkowo chcecie wykryć rodzaj portu szeregowego, polecam kod darmowego sterownika
+myszy dla DOSa - <a href="http://cutemouse.sourceforge.net/"
+hreflang="en" lang="en">CuteMouse</a> (a szczególnie plik comtest.asm).
+ Sterownik jest napisany w asemblerze i można
+go pobrać oraz obejrzeć jego kod źródłowy za darmo.
+</P>
+<P>
+Wykryć rodzaj portów równoległych można za pomocą układów nimi sterujących, na przykład
+<q lang="en">Intel 82091AA Advanced Integrated Peripheral</q> (porty 22h-23h). Kod dla
+tego układu może wyglądać następująco:</P>
+<pre>
+	mov	al, 20h		; numer rejestru, który chcemy odczytać
+	out	22h, al		; wysyłamy go na port adresu
+	out	0edh, al	; opóźnienie
+	in	al, 23h		; odczytujemy dane z portu danych</pre>
+
+<P>Informacje o portach równoległych znajdują się w bitach 5 i 6 odczytanego bajtu.
+Jeśli bity te mają wartość 0, to porty równoległe pracują w trybie zgodności z ISA,
+jeśli 1 - w trybie zgodności z PS/2, jeśli 2 - w trybie
+<acronym lang="en" title="Enhanced Parallel Port">EPP</acronym>, jeśli 3 - w trybie
+<acronym lang="en" title="Enhanced Capability Port">ECP</acronym>.</P>
+
+
+
+
+
+
+<BR><HR>
+<h2 class="nag"><a name="hw_tut02" id="hw_tut02">Wykrywanie karty dźwiękowej AdLib</a></h2>
+
+	<BR><a href="#hw_tut03" class="bezdruk">(przeskocz wykrywanie AdLib)</a>
+<P>
+Karta ta ma dwa podstawowe porty: port adresu i stanu - 388h (do odczytu i zapisu)
+oraz port danych - 389h (tylko do zapisu). By zapisać coś do jednego z 244 rejestru
+karty, wysyłamy jego numer na port 388h, po czym wysyłamy dane na port 389h.
+Algorytm wykrywania karty składa się z następujących kroków (źródło:
+<cite lang="en">Programming the AdLib/Sound Blaster FM Music Chips, Version 2.0 (24 Feb 1992),
+Copyright &copy; 1991, 1992 by Jeffrey S. Lee</cite>):</P>
+<ol>
+ <li>wyzerowanie obu czasomierzy poprzez zapisanie 60h do rejestru 4.</li>
+ <li>włączenie przerwań, zapisując 80h do rejestru 4. UWAGA: to musi być krok oddzielny od
+ 	pierwszego</li>
+ <li>odczytanie stanu karty (port 388h) i zachowanie wyniku</li>
+ <li>zapisanie FFh do rejestru 2 (czasomierz 1)</li>
+ <li>uruchomienie czasomierza 1 poprzez zapisanie 21h do rejestru 4. Czasomierz 1 będzie
+ 	zwiększał wartość zapisaną do rejestru 2 o 1 co każde 80 mikrosekund.</li>
+ <li>odczekanie co najmniej 80 mikrosekund</li>
+ <li>odczytanie stanu karty (port 388h) i zachowanie wyniku</li>
+ <li>wyzerowanie czasomierzy i przerwań (krok 1 i 2)</li>
+ <li>wyniki kroków 3 i 7 ANDować bitowo z wartością E0h. Wynikiem z kroku 3 powinna być wartość
+ 	0, a z kroku 7 - C0h. Jeśli obie się zgadzają, w komputerze zainstalowana jest
+ 	karta AdLib.</li>
+</ol>
+<P>Między każdym zapisem do portu adresu i wysłaniem danych należy odczekać 12 cykli karty.
+Po zapisaniu danych należy odczekać 84 cykle karty, zanim jakakolwiek kolejna operacja
+będzie mogła zostać wykonana. Ale że wygodniej jest operować w języku operacji niż cykli
+procesora karty, te czasy oczekiwania wynoszą odpowiednio: 6 i 35 razy czas potrzebny na
+odczytanie portu adresu. Ja w razie czego użyję odpowiednio: 10 i 40 operacji.</P>
+<P>
+Do wykrywania karty AdLib może posłużyć więc następujący kod:</P>
+<pre>
+	pisz_adlib 4, 60h
+	pisz_adlib 4, 80h
+
+	mov	dx, 388h
+	in	al, dx
+	mov	bl, al		; zachowanie stanu w kroku 3
+
+	pisz_adlib 2, 0FFh
+	pisz_adlib 4, 21h
+
+	mov	ah, 86h
+	xor	cx, cx
+	mov	dx, 100
+	int	15h		; wykonanie pauzy na 100 mikrosekund
+	jc	blad
+
+	mov	dx, 388h
+	in	al, dx
+	mov	bh, al		; zachowanie stanu w kroku 7
+
+	pisz_adlib 4, 60h
+	pisz_adlib 4, 80h
+
+	and	bx, 0E0E0h
+	cmp	bx, 0C000h	; sprawdzenie obu wyników (kroki 3 i 7) na raz
+	je	jest_adlib
+
+	; tu nie ma AdLib</pre>
+
+<P>gdzie makro <code>pisz_adlib</code> wygląda tak:</P>
+
+<pre>
+%imacro pisz_adlib 2	; %1 - numer rejestru, %2 - dane do wysłania
+	mov	dx, 388h
+	mov	al, %1
+	out	dx, al
+	mov	cx, 10
+%%loop1:		; opóźnienie pierwsze
+	in	al, dx
+	loop	%%loop1
+	inc	dx	; port 389h
+	mov	al, %2
+	out	dx, al
+	dec	dx
+	mov	cx, 40
+%%loop2:		; opóźnienie drugie
+	in	al, dx
+	loop	%%loop2
+%endm</pre>
+
+
+
+
+
+
+
+<BR><HR>
+<h2 class="nag"><a name="hw_tut03" id="hw_tut03">Wykrywanie karty dźwiękowej
+	<span lang="en">SoundBlaster</span></a></h2>
+
+	<BR><a href="#hw_tut04" class="bezdruk">(przeskocz wykrywanie SB)</a>
+<P>
+Karta SoundBlaster może być zaprogramowana do korzystania z różnych portów podstawowych.
+Najczęściej spotykana wartość to 220h, ale możliwe są też między innymi 210h, 230h,
+240h, 250h, 260h i 280h. Struktura jest podobna, jak w karcie AdLib: zakładając, że
+port bazowy to 220h, to dla lewego kanału portem adresu jest 220h, a portem danych - 221h,
+zaś dla prawego - odpowiednio 222h i 223h. Porty karty AdLib - 388h i 389h - służą do operacji na
+obu kanałach.</P>
+<P>
+Wykrywanie tej karty przebiega tak samo, jak dla karty AdLib (procedura 9 kroków powyżej),
+ale skoro porty bazowe mogą być różne, proponuję następującą modyfikację makra do wysyłania danych:</P>
+<pre>
+%imacro pisz_sb 3	; %1 - port bazowy, %2 - numer rejestru, %3 - dane
+	mov	dx, %1
+	mov	al, %2
+	out	dx, al
+	mov	cx, 6
+%%loop1: 		; opóźnienie pierwsze
+	in	al, dx
+	loop	%%loop1
+	inc	dx	; port danych
+	mov	al, %3
+	out	dx, al
+	dec	dx
+	mov	cx, 35
+%%loop2: 		; opóźnienie drugie
+	in	al, dx
+	loop	%%loop2
+
+%endm</pre>
+
+
+
+
+
+
+
+
+<BR><HR>
+<h2 class="nag"><a name="hw_tut04" id="hw_tut04">Wykrywanie zainstalowanych dysków twardych</a></h2>
+
+	<BR><a href="#hw_tut05" class="bezdruk">(przeskocz wykrywanie dysków)</a>
+<P>
+Jeśli BIOS wykryje jakieś dyski twarde, ich liczbę wpisuje do komórki pamięci pod adresem
+0040h:007Eh (1 bajt).<br>
+Zakresy portów kontrolerów dysków twardych to:
+01F0h-01F7h (pierwszy kontroler), 0170h-0177h (drugi). Są jeszcze 2 kontrolery, opisane
+jako EIDE: 01E8h-01EFh (trzeci kontroler) i 168h-016Fh (czwarty).
+</P>
+<P>
+Każdy kontroler może obsłużyć dwa dyski - <span lang="en">Master</span> i <span lang="en">Slave</span>.
+Wyboru dysku, na którym wykonywane są operacje, dokonuje się, zapisując do portu baza+6 (gdzie baza
+to 01F0h, 0170h, 01E8h lub 168h). Bity 7 i 5 muszą być równe 1, a bitem czwartym wybiera się
+dysk (0=pierwszy, 1=drugi).</P>
+<P>
+ Komendy wysyła się do portu baza+7, a dane (po 512 bajtów)
+odczytuje się z portu bazowego. Przed wysłaniem komend należy sprawdzić, czy kontroler lub
+dysk nie są zajęte. Robi się to odczytując port stanu, będący zarazem portem komend (czyli baza+7).
+Bit 7 mówi, czy kontroler jest zajęty (powinien być równy zero), bit 6 - czy dysk jest gotowy
+do operacji (powinien być równy 1), bit 4 - czy dysk przeszedł na właściwą pozycję (powinien
+być równy 1). Reszta bitów jest nieistotna, jeśli chodzi o wysyłanie komend.<br>
+Portu statusu można użyć też, obok portu baza+1, do wykrywania błędów.
+</P>
+<P>
+Możemy już więc napisać taki oto kod:</P>
+<pre>
+	mov	dx, 1f7h
+spr_dysk:
+	in	al, dx
+	cmp	al, 50h		; dysk gotowy, kontroler niezajęty
+	jnz	spr_dysk</pre>
+
+<P>Gdy dysk jest gotów na przyjmowanie komend, można zacząć wysyłać nasze żądania. Najpierw
+ustawiamy, do którego dysku będziemy chcieli wysyłać dane:</P>
+
+<pre>
+	mov	dx, 1f6h
+	mov	al, 10100000b	; bit 4 = 0, wiec pierwszy dysk
+	out	dx, al</pre>
+
+<P>Po tym, w razie czego, sprawdzamy ponownie gotowość dysku poprzednim kodem. Jeśli dysk jest
+gotów, wysyłamy komendę:</P>
+
+<pre>
+	mov	dx, 1f7h
+	mov	al, 0ech	; kod rozkazu identyfikacji
+	out	dx, al</pre>
+
+<P>Przed odczytaniem danych musimy jednak sprawdzić nie tylko, czy dysk już jest gotów (czy
+skończył przetwarzać żądanie), ale też to, czy dane już są gotowe do odebrania. Sprawdzamy to
+podobnie, jak poprzednio, zamieniając tylko 50h na 58h (co dodatkowo sprawdza, czy
+bufor sektorów dysku wymaga obsługi - czyli czy są już dla nas dane):</P>
+
+<pre>
+	mov	dx, 1f7h
+spr_dysk:
+	in	al, dx
+	cmp	al, 58h		; dysk gotowy, kontroler niezajęty, są dane
+	jnz	spr_dysk</pre>
+
+<P>Po sprawdzeniu, że dane są dostępne, odbieramy je, lecz w nietypowy sposób: zamiast
+odbierać po jednym bajcie, odbieramy pod dwa na raz, do rejestru AX, po czym zamieniamy
+jego połówki miejscami. Jest to związane ze sposobem wysyłania danych przez dysk. Kod wygląda
+tak:</P>
+
+<pre>
+	mov	cx, 512/2	; tyle słów do przeczytania
+	mov	dx, 1f0h	; stąd czytać
+	xor	di, di		; wskaźnik do bufora
+czytaj:
+	in	ax, dx		; wczytaj 2 bajty z portu DX
+	xchg	al, ah		; zamień połówki miejscami
+	mov	[bufor+di], ax	; zapisz wynik do bufora
+	add	di, 2		; przejdź na kolejną pozycję w buforze
+	loop	czytaj
+        ...
+bufor:		times 513 db 0	; dość, by pomieścić 1 sektor</pre>
+
+<P>Dysk zwraca nam 512 bajtów. Model dysku znajdziecie pod adresem 14h w buforze, ma
+on długość 10 słów (20 bajtów). Numer seryjny jest pod adresem 36h  w buforze, ma
+on długość 20 słów (40 bajtów). W obu tych przypadkach, jeśli pierwszym słowem
+pod wskazanym adresem jest zero, to dysk nie podał tych informacji.
+</P>
+<P>
+Pozyskanie tych informacji od napędów optycznych (CD, DVD) różni się tylko kodem
+operacji - zamiast ECh jest to A1h.</P>
+
+
+
+
+
+
+
+<BR><HR>
+<h2 class="nag"><a name="hw_tut05" id="hw_tut05">Wykrywanie napędów dyskietek</a></h2>
+
+	<BR><a href="#hw_tut06" class="bezdruk">(przeskocz wykrywanie napędów dyskietek)</a>
+<P>
+Wykrywanie typów napędów dyskietek jest znacznie prostsze niż w przypadku dysków twardych.
+W czasie uruchamiania komputera, BIOS wyszukuje napędy dyskietek i wpisuje je do CMOSu,
+skąd można je łatwo odczytać. Ze te informacje odpowiada bajt numer 10h. Odczytanie go wygląda
+tak:</P>
+
+<pre>
+	mov	al, 10h		; numer bajtu do odczytania
+	out	70h, al		; port adresu CMOSu
+	out	0edh, al	; opóźnienie
+	in	al, 71h		; odczytanie wartości z portu danych CMOSu</pre>
+
+<P>Starsze 4 bity odczytanego bajtu odpowiadają pierwszemu napędowi, młodsze - drugiemu.
+I tak: wartość 0 oznacza brak danego
+napędu,  01h - 5,25 cala 360 kB, 02h - 5,25 cala 1,2 MB, 03h - 3,5 cala 720 kB,
+04h - 3,5 cala 1,44 MB, 05h - 3,5 cala 2,88 MB.</P>
+
+
+
+
+
+
+
+<BR><HR>
+<h2 class="nag"><a name="hw_tut06" id="hw_tut06">Wykrywanie myszy</a></h2>
+
+	<BR><a href="#hw_tut07" class="bezdruk">(przeskocz wykrywanie myszy)</a>
+<P>
+Ogólnie wykrywanie myszy jako urządzenia może być dość skomplikowane, nie tylko ze
+względu na różnorodność złączy (szeregowa, PS/2, <acronym lang="en"
+title="Universal Serial Bus">USB</acronym>), ale także ze względu na
+różnorodność protokołów komunikacji z myszami. Wszystko to na szczęście jest
+zawarte w otwartym sterowniku myszy dla DOSa - <a href="http://cutemouse.sourceforge.net/"
+hreflang="en" lang="en">CuteMouse</a>. Sterownik jest napisany w asemblerze i można
+go pobrać oraz obejrzeć jego kod źródłowy za darmo.
+</P>
+<P>
+Jeśli wystarczy Wam wiedzieć, czy jest załadowany jakikolwiek sterownik do myszy
+(co wskazywałoby na istnienie myszy), wystarczy taki oto kod:</P>
+
+<pre>
+	xor	ax, ax
+	mov	es, ax
+	les	di, [es:33h &lt;&lt; 2]	; sprawdź, czy wektor przerwania
+					; sterownika myszy nie jest zerem
+	mov	ax, es
+	or	ax, di
+	jz	brak_myszy
+
+	mov	al, [es:di]
+	cmp	al, 0cfh		; sprawdź, czy procedura obsługi
+					; przerwania myszy nie składa się
+					; wyłącznie z instrukcji iret
+	je	brak_myszy
+
+	xor	ax, ax
+	int	33h			; sprawdź, czy sterownik zgłasza mysz
+	test	ax, ax
+	jz	brak_myszy</pre>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm" name="hw_tut07" id="hw_tut07"
+	>Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

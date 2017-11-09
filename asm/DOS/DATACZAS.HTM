@@ -1,0 +1,87 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Data i czas </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Pobieranie i ustawiadnie daty oraz godziny w języku asembler">
+<META NAME="Keywords" CONTENT="assembler, asm, asembler, czas, data">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Pobieranie i ustawianie daty oraz godziny</h1>
+<P>
+W DOSie do pobierania bieżącej daty służy bezargumentowa funkcja numer 2Ah przerwania 21h. Po
+ jej wywołaniu, w rejestrze CX dostajemy bieżący rok, w DH - miesiąc, a w DL - dzień miesiąca.
+ Ponadto, w AL dostajemy numer dnia tygodnia (0 oznacza niedzielę)</P>
+<P>
+Datę ustawia się, podając te same dane (z wyjątkiem dnia tygodnia) w tych samych rejestrach
+ i wywołując funkcję 2Bh przerwania 21h.
+</P>
+<P>
+Czas pobiera się bezargumentową funkcją 2Ch przerwania 21h. Po jej wywołaniu, w rejestrze CH
+ dostajemy bieżącą godzinę, w CL - minutę, a w DH - sekundę. Aby zmienić bieżący czas systemowy,
+ te same argumenty w tych samych rejestrach podajemy funkcji 2Dh przerwania 21h.
+</P>
+<P>
+Oto krótki program dla NASMa, ilustrujący omówione funkcje:</P>
+
+<pre title="Program pobierający bieżącą datę i czas">
+; Program pobierający bieżącą datę i godzinę. Program NIC NIE WYŚWIETLA.
+;
+; Autor: Bogdan D., bogdandr (at) op.pl
+;
+; kompilacja:
+;   nasm -f bin -o dataczas.com dataczas.asm
+
+org 100h
+
+	mov	ah, 2ah		; 2B = ustaw
+	int	21h
+
+	mov	[rok], cx
+	mov	[mies], dh
+	mov	[dzien], dl
+	mov	[dzient], al
+
+	mov	ah, 2ch		; 2D = ustaw
+	int	21h
+
+	mov	[godz], ch
+	mov	[min], cl
+	mov	[sek], dh
+
+	mov	ax, 4c00h
+	int	21h
+
+rok	dw	0
+mies	db	0
+dzien	db	0
+dzient	db	0
+
+godz	db	0
+min	db	0
+sek	db	0</pre>
+
+
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm" tabindex="1">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+
+</BODY></HTML>

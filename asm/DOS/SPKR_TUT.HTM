@@ -1,0 +1,182 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Programowanie głośniczka </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="PC Speaker - programowanie">
+<META NAME="Keywords" CONTENT="PC Speaker, głośniczek, asm, assembler, asembler">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Programowanie głośniczka w asemblerze</h1>
+
+
+<P>
+Czy nie myślicie czasem, jakby to było, gdyby można było wzbogacić swój
+program oprócz efektu wizualnego, także o efekt dźwiękowy?<BR>
+Programowanie kart dźwiękowych (zwłaszcza tych nowoczesnych) może sprawiać
+niemałe kłopoty. Stary, poczciwy <span lang="en">PC-Speaker</span> jest jednak urządzeniem względnie
+prostym w programowaniu i to właśnie tutaj udowodnię. Najpierw troszkę teorii, potem - do dzieła!
+</P>
+<P>
+Sporo urządzeń w komputerze ma własne porty, przez które można się
+z nimi komunikować. Jednak głośniczek komputerowy nie ma własnego
+portu.<BR>
+ Jest tak przede wszystkim ze względu na oszczędności w budowie
+pierwszych PC-tów. Zamiast dać osobny port na głośnik, firmy
+produkujące komputery wcisnęły go <q>pod opiekę</q> dwóch innych urządzeń:</P>
+<UL>
+ <LI>czasomierza systemowego, który posłuży nam do wytworzenia impulsów
+  odpowiedniej częstotliwości<BR><BR></LI>
+ <LI>kontrolera klawiatury, który kontroluje, czy jest otwarty <q>kanał</q> z
+  czasomierza do głośniczka, czyli czy można będzie wysyłać informacje.<BR><BR></LI>
+</UL>
+<P>Podstawowe porty czasomierza to porty od 40h do 43h (cały zakres to
+40h - 5fh, <q>h</q> oznacza <q>szesnastkowo</q>), kontrolera klawiatury zaś - 60h do 64h
+(cały zakres: 60h - 6fh).<BR>
+ Nie będziemy ich jednak wszystkich używać. Będą na interesować tylko
+porty 42h, 43h i 61h.</P>
+
+
+<P> Zacznijmy więc coś pisać:</P>
+<PRE>	in al,61h
+	or al,3
+	out 61h,al</PRE>
+
+<P> Co zrobiliśmy? W spisie portów
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html"
+ hreflang="en">Listy Przerwań Ralfa <span lang="en">Brown</span>'a</A> czytamy:<BR></P>
+	<BR><a href="#spkr_tut01" tabindex="1" class="bezdruk">(przeskocz port 61h)</a>
+<PRE lang="en" title="port 61h">
+	0061  R-  KB controller port B control register (ISA, EISA)
+	0061  -W  KB controller port B (ISA, EISA)
+
+	(R - czytanie (read) , W - pisanie (write))</PRE>
+
+<P><a name="spkr_tut01" id="spkr_tut01">oraz</a>:</P>
+	<BR><a href="#spkr_tut02" class="bezdruk">(przeskocz opis portu 61h)</a>
+<PRE lang="en" title="opis portu 61h">
+	Bitfields for KB controller port B (system control port) [output]:
+	Bit(s)  Description     (Table P0392)
+	 7      pulse to 1 for IRQ1 reset (PC,XT)
+	 6-4    reserved
+	 3      I/O channel parity check disable
+	 2      RAM parity check disable
+	 1      speaker data enable
+	 0      timer 2 gate to speaker enable</PRE>
+
+<P>
+ <a name="spkr_tut02" id="spkr_tut02">Komenda <CODE>IN AL,61h</CODE></a>
+  czyta bieżący status kontrolera, <CODE>OR AL,3</CODE> ustawia
+(włącza) bity 0 (włączenie bramki do głośniczka) oraz 1 (włączenie
+możliwości wysyłania danych do głośniczka), <CODE>OUT 61h,AL</CODE> zapisuje
+nowy status do kontrolera.</P>
+
+<P>Głośniczek jest włączony. Trzeba mu podać jakiś sygnał. Do tego posłuży
+nam czasomierz. W spisie portów czytamy:</P>
+	<BR><a href="#spkr_tut03" class="bezdruk">(przeskocz opis portów 42h i 43h)</a>
+<PRE lang="en" title="porty 42h i 43">
+	0042  RW  PIT  counter 2, cassette &amp; speaker
+
+	0043  RW  PIT  mode port, control word register for counters 0-2
+	    Once a control word has been written (43h), it must be followed
+	    immediately by performing the corresponding action to the counter
+	    registers (40h-42h), else the system may hang!!</PRE>
+
+
+<P>
+<a name="spkr_tut03" id="spkr_tut03">Do portów tych nie będziemy wysyłać</a> jednak
+częstotliwości, którą chcemy uzyskać. Czasomierz pracuje na częstotliwości 1193181 (1234DDh)
+<abbr title="Hertz">Hz</abbr> i to tę wartość dzielimy przez żądaną częstotliwość, a wynik wysyłamy
+do odpowiednich portów.</P>
+
+<P>Piszmy więc:</P>
+	<BR><a href="#spkr_tut04" class="bezdruk">(przeskocz włączanie głośniczka)</a>
+<PRE title="włączenie głośniczka na nutę A">
+	mov bx,440h	; Standardowy dźwięk A, 440 Hz
+	mov dx,12h	; górna część liczby 1234dd
+	mov ax,34ddh	; dolna część liczby 1234dd
+	div bx		; ax = wartość do wysłania
+
+	pushf		; zachowaj flagi
+	push ax		; zachowaj wartość do wysłania
+	cli		; wyłącz przerwania
+	mov al,0b6h
+	out 43h,al	; wyślij komendę
+
+	pop ax
+	out 42h,al	; wyślij pierwszą połowę licznika
+	mov al,ah
+	out 42h,al	; wyślij drugą połowę licznika
+	popf		; przywróć stan flagi przerwań
+	</PRE>
+
+<P>
+ <a name="spkr_tut04" id="spkr_tut04">No i co my tutaj znowu zrobiliśmy?</a><BR>
+ 4 pierwsze komendy to oczywiście uzyskanie wartości do wysłania na port,
+ale reszta?<BR>
+<P>Najpierw: 0b6h = 1011 0110<BR><br>
+
+Bity 7 i 6 = 10 = wybierz (standardowo niezajęty) czasomierz nr 2
+   (łącznie są 3: zegar czasu rzeczywistego, czasomierz odświeżania
+     pamięci RAM i ten trzeci, nieużywany)<BR>
+Bity 5 i 4 = 11 = zapisujemy do czasomierza najpierw młodsze bity (0-7)
+     wartości, potem starsze (8-15)<BR>
+Bity 3-1   = 011 = wybierz tryb nr 3, czyli generator fali kwadratowej<BR>
+Bit 0      = 0   = licznik binarny 16-bitowy.<BR>
+
+</P>
+<P>Zgodnie z tym, najpierw wysyłamy młodszy bajt, AL a potem starszy, AH.</P>
+
+<P>
+ Skoro na port można wysłać największą wartość 0ffffh (teoretycznie
+największa jest 10000h, obcinana do 0000h), to jakiej odpowiada to
+częstotliwości?<BR>
+ 1234dd / 10000h to ok. 12h, czyli 18. A dokładniej jest to coś około
+18,2 Hz - standardowa częstotliwość zegara w komputerze (aby
+odmierzyć 1 sekundę trzeba ok 18 tyknięć tego zegara)</P>
+
+ <P>Nasz głośniczek już gra. Teraz trzeba sprawić, bo to troszkę potrwało.
+Pomocne będzie przerwanie 15h, funkcja 86h:</P>
+<PRE>	mov cx,0fh
+	mov dx,4240h
+	mov ah,86h
+	int 15h			; pauza o długości CX:DX mikrosekund</PRE>
+
+<P>
+ I dźwięk trwa 1 sekundę (F4240h = 1.000.000). Teraz trzeba go
+wyłączyć. Nic prostszego. Po prostu zamkniemy przejście między
+czasomierzem a głośniczkiem:</P>
+<PRE>	in al,61h
+	and al,not 3		; zerujemy bity 0 i 1
+				; NASM:  &quot;and al,~3&quot;
+	out 61h,al</PRE>
+
+<P>
+Mam nadzieję, że podałem wystarczająco informacji, abyście samodzielnie zaczęli programować
+głośniczek. Jeśli mi się nie udało, to zawsze możecie skorzystać z gotowej procedury z mojej
+biblioteki.
+</P>
+<P>
+To już koniec. Miłej zabawy!</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

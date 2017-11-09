@@ -1,0 +1,696 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS, część 1 - Podstawy </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Next"     hreflang="pl" lang="en" href="a_kurs02.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author"      CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Kurs języka asembler">
+<META NAME="Language"    CONTENT="pl">
+<META NAME="Generator"   CONTENT="KWrite">
+<META NAME="Keywords"    CONTENT="kurs, asm, asembler, assembler, rejestry, program, kompilatory,
+	system dwójkowy, system szesnastkowy, bit, bajt, binarny, hex, org, nasm, tasm, fasm">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:47 GMT">
+</HEAD><BODY>
+
+<div class="c">Jak pisać programy w języku asembler?<BR>
+	<h1 class="nag">Część 1 - Podstawy, czyli czym to się je</h1></div>
+
+<P>
+Wyobraźcie sobie, jakby to było móc programować maszynę bezpośrednio, czyli <q>rozmawiać</q> z
+procesorem bez pośrednictwa struktur wysokiego poziomu, na przykład takich jak spotykamy w języku C.
+Bezpośrednie operowanie na procesorze umożliwia przecież pełną kontrolę jego działań! Bez
+zbędnych instrukcji i innych <q>śmieci</q> spowalniających nasze programy.
+</P>
+<P>
+Czy już czujecie chęć pisania najkrótszych i najszybszych programów na świecie?<BR>
+Programów, których czasem w ogóle NIE MOŻNA napisać w innych językach? Brzmi wspaniale, prawda?
+</P>
+<P>
+Tylko pomyślcie o tym, co powiedzieliby znajomi, gdybyście się im pochwalili. Widzicie już te
+ich zdumione miny?
+</P>
+<P>
+Miła perspektywa, prawda? No, ale dość już gadania. Zabierajmy się do rzeczy!
+</P>
+
+<BR>Zacznijmy od krótkiego wprowadzenia:<BR><HR>
+<h2 class="nag">Niedziesiętne systemy liczenia</h2>
+  <OL>
+   <LI>Dwójkowy (binarny)
+	<P>
+    Najprostszy dla komputera, gdzie coś jest albo włączone, albo wyłączone. System ten operuje na
+    liczbach zwanych <span class="b">bitami</span> (bit = <span lang="en">binary digit</span>
+     = cyfra dwójkowa).
+    Bit przyjmuje jedną z dwóch wartości: 0 lub 1.<BR>
+    Na <span class="b">bajt</span> składa się 8 bitów. Jednym bajtem można przedstawić więc
+     2^8=256 możliwości.</P>
+	<P>
+    Przeliczenie liczby zapisanej w systemie dwójkowym na dziesiętny jest proste. Podobnie
+	jak w systemie dziesiętnym, każdą cyfrę mnożymy przez odpowiednią potęgę podstawy
+	(podstawa wynosi 2 w systemie dwójkowym, 10 w systemie dziesiętnym).</P>
+	<P>
+    Oto przykład (niech daszek ^ oznacza potęgowanie):<BR>
+	 1010 1001 dwójkowo =<BR>
+	 1*(2^7) + 0*(2^6) + 1*(2^5) + 0*(2^4) + 1*(2^3) + 0*(2^2) + 0*(2^1) + 1*(2^0) = <BR>
+	 128 + 32 + 8 + 1 =<BR>
+	 169 dziesiętnie (lub <q>dec</q>, od <q><span lang="en">decimal</span></q>).</P>
+
+    Działanie odwrotne też nie jest trudne: naszą liczbę dzielimy ciągle (do chwili
+	uzyskania ilorazu równego 0) przez 2, po czym zapisujemy reszty z dzielenia wspak:
+	<BR><a href="#a_kurs0101" tabindex="1" class="bezdruk">(przeskocz konwersję liczby dziesiętnej na dwójkową)</a>
+ <PRE title="dziesiętny na binarny" class="asciiart">
+	169	|
+	 84	| 1
+	 42	| 0
+	 21	| 0
+	 10	| 1
+	  5	| 0
+	  2	| 1
+	  1	| 0
+	  0	| 1</PRE>
+	  <a name="a_kurs0101" id="a_kurs0101">Wspak dostajemy</a>: 1010 1001, czyli wyjściową liczbę.
+	<BR><BR></LI>
+
+
+
+
+   <LI>Szesnastkowy (heksadecymalny, w skrócie hex)
+	<P>
+    Jako że system dwójkowy ma mniej cyfr niż dziesiętny, do przedstawienia względnie małych
+    liczb trzeba użyć dużo zer i jedynek. Jako że bajt ma 8 bitów, podzielono go na dwie równe,
+    czterobitowe części. Teraz bajt można już reprezentować dwoma znakami, a nie ośmioma. Na każdy
+    taki znak składa się 2^4=16 możliwości. Stąd wzięła się nazwa <q>szesnastkowy</q>.<BR>
+    Powstał jednak problem: cyfr jest tylko 10, a trzeba mieć 16. Co zrobić?<BR>
+    Postanowiono liczbom 10-15 przyporządkować odpowiednio znaki A-F.<BR>
+    Na przykład<BR>
+    Liczba 255 dziesiętnie = 1111 1111 binarnie = FF szesnastkowo (1111 bin = 15 dec = F hex)<BR>
+    Liczba 150 dziesiętnie = 1001 0110 binarnie = 96 szesnastkowo.
+	</P>
+	<P>
+
+   Należy zauważyć ścisły związek między systemem dwójkowym i szesnastkowym:
+	1 cyfra szesnastkowa to 4 bity, co umożliwia błyskawiczne przeliczanie między obydwoma
+	systemami: wystarczy <q>tłumaczyć</q> po 4 bity (1 cyfrę hex) na raz i zrobione.
+	</P>
+	<P>
+    Przeliczenie liczby zapisanej w systemie szesnastkowym na dziesiętny jest równie proste,
+	jak tłumaczenie z dwójkowego na dziesiętny. Każdą cyfrę mnożymy przez odpowiednią
+	 potęgę podstawy (podstawa wynosi 16 w systemie szesnastkowym).
+	</P>
+	<P>
+    Oto przykład:<BR>
+	 10A szesnastkowo =<BR>
+	 1*16^2 + 0*16^1 + A*16^0 =<BR>
+	 256 + 0 + 10 =<BR>
+	 266 dziesiętnie.</P>
+
+    Działanie odwrotne też nie jest trudne: naszą liczbę dzielimy ciągle (do chwili
+	uzyskania ilorazu=0) przez 16, po czym zapisujemy reszty z dzielenia wspak:
+	<BR><a href="#a_kurs0102" class="bezdruk">(przeskocz konwersję liczby dziesiętnej na szesnastkową)</a>
+ <PRE title="dziesiętny na szesnastkowy" class="asciiart">
+	 266	|
+	 16	| 10
+	  1	| 0
+	  0	| 1</PRE>
+	  <a name="a_kurs0102" id="a_kurs0102">Wspak dostajemy kolejno</a>: 1, 0 i 10, czyli 10A, czyli wyjściową liczbę.<BR><BR>
+
+	Podczas pisania programów, liczby w systemie szesnastkowym oznacza się przez dodanie
+	na końcu litery <span class="b">h</span> (lub z przodu <span class="b">0x</span>),
+	a liczby w systemie dwójkowym - przez dodanie litery <span class="b">b</span>.<BR>
+	 Tak więc, 101 oznacza dziesiętną liczbę o wartości 101, 101b oznacza liczbę 101 w
+	systemie dwójkowym (czyli 5 w systemie dziesiętnym), a 101h lub 0x101 oznacza liczbę
+	101 w systemie szesnastkowym (czyli 257 dziesiętnie).
+     </LI></OL>
+<BR><HR>
+<h2 class="nag">Język asembler i rejestry procesora</h2>
+<P>
+ Co to w ogóle jest asembler?</P>
+<P>
+   Asembler jest to język programowania, należący do języków niskiego poziomu.
+   Znaczy to tyle, że jednej komendzie asemblera odpowiada dokładnie jeden rozkaz procesora.
+   Asembler operuje na rejestrach procesora.</P>
+
+<P>   A co to jest rejestr procesora?</P>
+<P>
+   Rejestr procesora to zespół układów elektronicznych, mogący przechowywać informacje (taka
+   własna pamięć wewnętrzna procesora).</P>
+<P>
+   Zaraz podam Wam podstawowe rejestry, na których
+   będziemy operować. Wiem, że ich liczba może przerazić, ale od razu mówię, abyście
+    <em class="wazne">NIE uczyli
+   się tego wszystkiego na pamięć</em>! Najlepiej zrobicie, czytając poniższą listę tylko 2 razy, a
+   potem wracali do niej, gdy jakikolwiek rejestr pojawi się w programach, które
+   będę później prezentował w ramach tego kursu.<BR>
+
+   Oto lista interesujących nas rejestrów:</P>
+ <OL>
+   <LI> ogólnego użytku:<BR><BR>
+    <UL>
+     <LI>akumulator:<BR>
+     			 RAX (64 bity) = EAX (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 EAX (32 bity) = AX (młodsze 16 bitów) + starsze 16 bitów,<BR>
+                     AX = AH (starsze 8 bitów) + AL (młodsze 8 bitów)<BR>
+	Rejestr ten najczęściej służy do wykonywania działań matematycznych, ale często w tym
+	rejestrze lub jego części (AX lub AH) będziemy mówić systemowi operacyjnemu i
+	<acronym lang="en" title="Basic Input/Output System">BIOS</acronym>-owi,
+	co od niego chcemy.
+	<BR><BR></LI>
+
+     <LI>rejestr bazowy:<BR>
+     			 RBX (64 bity) = EBX (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 EBX (32 bity) = BX (młodsze 16 bitów) + starsze 16 bitów,<BR>
+                 BX = BH (starsze 8 bitów) + BL (młodsze 8 bitów)<BR>
+	Ten rejestr jest używany na przykład przy dostępie do tablic.
+	<BR><BR></LI>
+
+     <LI>licznik:<BR>
+     			 RCX (64 bity) = ECX (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 ECX (32 bity) = CX (młodsze 16 bitów) + starsze 16 bitów,<BR>
+                  CX = CH (starsze 8 bitów) + CL (młodsze 8 bitów)<BR>
+	Tego rejestru używamy na przykład do określania ilości powtórzeń pętli.
+	<BR><BR></LI>
+
+     <LI>rejestr danych:<BR>
+     			 RDX (64 bity) = EDX (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 EDX (32 bity) = DX (młodsze 16 bitów) + starsze 16 bitów,<BR>
+                         DX = DH (starsze 8 bitów) + DL (młodsze 8 bitów)<BR>
+	W tym rejestrze przechowujemy adresy różnych zmiennych. Jak wkrótce zobaczymy, do tego
+	rejestru będziemy wpisywać adres napisu, który będziemy chcieli wyświetlić.
+	<BR><BR></LI>
+
+     <LI>rejestry dostępne <span class="b">tylko w trybie 64-bitowym</span>:<BR>
+     	<UL>
+	 <LI>8 rejestrów 8-bitowych: R8B, R9B, ..., R15B (lub R8L, R9L, ..., R15L)</LI>
+	 <LI>8 rejestrów 16-bitowych: R8W, R9W, ..., R15W</LI>
+	 <LI>8 rejestrów 32-bitowych: R8D, R9D, ..., R15D</LI>
+	 <LI>8 rejestrów 64-bitowych: R8, R9, ..., R15</LI>
+	</UL><BR><BR></LI>
+
+
+     <LI>rejestry indeksowe:
+      <UL>
+       <LI>indeks źródłowy:<BR>
+       			 RSI (64 bity) = ESI (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 ESI (32 bity) = SI (młodsze 16 bitów) + starsze 16 bitów,<BR>
+			 SI (16 bitów) = SIL (młodsze 8 bitów) + starsze 8 bitów <span class="b">(tylko tryb 64-bit)</span> <BR><BR></LI>
+       <LI>indeks docelowy:<BR>
+       			 RDI (64 bity) = EDI (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 EDI (32 bity) = DI (młodsze 16 bitów) + starsze 16 bitów,<BR>
+			 DI (16 bitów) = DIL (młodsze 8 bitów) + starsze 8 bitów <span class="b">(tylko tryb 64-bit)</span> </LI>
+      </UL>
+	Rejestry indeksowe najczęściej służą do operacji na długich łańcuchach danych, w tym
+	napisach i tablicach.
+	<BR><BR></LI>
+     <LI>rejestry wskaźnikowe:
+      <UL>
+       <LI>wskaźnik bazowy:<BR>
+       			 RBP (64 bity) = EBP (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 EBP (32 bity) = BP (młodsze 16 bitów) + starsze 16 bitów.<BR>
+			 BP (16 bitów) = BPL (młodsze 8 bitów) + starsze 8 bitów <span class="b">(tylko tryb 64-bit)</span> <BR>
+	Najczęściej służy do dostępu do zmiennych lokalnych.
+	<BR><BR></LI>
+       <LI>wskaźnik stosu:<BR>
+       			 RSP (64 bity) = ESP (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 ESP (32 bity) = SP (młodsze 16 bitów) + starsze 16 bitów.<BR>
+			 SP (16 bitów) = SPL (młodsze 8 bitów) + starsze 8 bitów <span class="b">(tylko tryb 64-bit)</span> <BR>
+	Służy do dostępu do stosu (o tym nieco później).
+	<BR><BR></LI>
+       <LI>wskaźnik instrukcji:<BR>
+       			 RIP (64 bity) = EIP (młodsze 32 bity) + starsze 32 bity,<BR>
+     			 EIP (32 bity) = IP (młodsze 16 bitów) + starsze 16 bitów.<BR>
+	Mówi procesorowi, skąd ma pobierać instrukcje do wykonywania.
+	</LI>
+      </UL></LI>
+    </UL><BR>
+  <LI>rejestry segmentowe (wszystkie 16-bitowe):<BR><BR>
+   <UL>
+    <LI>segment kodu CS - mówi procesorowi, gdzie znajdują się dla niego instrukcje.</LI>
+    <LI>segment danych DS - ten najczęściej pokazuje na miejsce, gdzie trzymamy nasze
+	zmienne.</LI>
+    <LI>segment stosu SS - dzięki niemu wiemy, w którym segmencie jest nasz stos. O tym,
+	czym w ogóle jest stos, powiem w następnej części.</LI>
+    <LI>segment dodatkowy ES - często używany, gdy chcemy coś napisać lub narysować na ekranie
+	bez pomocy <span lang="en">Windows</span>,
+	 <acronym lang="en" title="Disk Operating System">DOS</acronym>a
+	 czy nawet BIOSu. </LI>
+    <LI>FS i GS (dostępne dopiero od 80386) - nie mają specjalnego przeznaczenia. Są tu
+	na wypadek, gdyby zabrakło nam innych rejestrów segmentowych.</LI>
+   </UL><BR>
+  <LI>rejestr stanu procesora: FLAGI (16-bitowe), E-FLAGI (32-bitowe) lub R-FLAGI (64-bitowe).<BR>
+  	 Służą one przede wszystkim do badania
+	wyniku ostatniej operacji (na przykład czy nie wystąpiło przepełnienie, czy wynik jest
+	zerem, itp.). Najważniejsze flagi to
+	 CF (<span lang="en">carry flag</span> - flaga przeniesienia),
+	 OF (<span lang="en">overflow flag</span> - flaga przepełnienia),
+	 SF (<span lang="en">sign flag</span> - flaga znaku),
+	 ZF (<span lang="en">zero flag</span> - flaga zera),
+	 IF (<span lang="en">interrupt flag</span> - flaga przerwań),
+	 PF (<span lang="en">parity flag</span> - flaga parzystości),
+	 DF (<span lang="en">direction flag</span> - flaga kierunku).<BR><BR></LI>
+ </OL>
+<P>
+   Użycie litery <q>R</q> przed symbolem rejestru, na przykład RCX, oznacza rejestr 64-bitowy,
+   <span class="b">dostępny tylko na procesorach 64-bitowych</span>.<BR>
+   Użycie litery <q>E</q> przed symbolem rejestru, na przykład EAX, oznacza rejestr 32-bitowy,
+   <span class="b">dostępny tylko na procesorach rodziny 80386 lub lepszych</span>.
+   Nie dotyczy to rejestru ES.</P>
+
+   Napisy <blockquote>RAX = EAX+starsze 32 bity;  EAX=AX + starsze 16 bitów;  AX=AH+AL</blockquote>
+    oznaczają takie zależności między tymi rejestrami:
+	<BR><a href="#a_kurs0103" class="bezdruk">(przeskocz rozwinięcie rejestru RAX)</a>
+<PRE title="RAX, EAX, AX oraz AH i AL" class="asciiart">
+				RAX (64 bity)
+				    |               EAX (32b)
+   00000000000000000000000000000000 | 0000000000000000 | 00000000 | 00000000
+     		  32b	     	    |	     16b       |        AX(16b)
+                       		    | 		       |   AH(8b) |   AL(8b)</PRE>
+	  <a name="a_kurs0103" id="a_kurs0103">Napisy</a>
+    <blockquote>RSI = ESI + starsze 32 bity;  ESI = SI + starsze 16 bitów;
+    SI = SIL+starsze 8 bitów</blockquote> oznaczają:
+	<BR><a href="#a_kurs0104" class="bezdruk">(przeskocz rozwinięcie rejestru RSI)</a>
+<PRE title="RSI, ESI, SI oraz SIL" class="asciiart">
+				RSI (64 bity)
+				    |               ESI (32b)
+   00000000000000000000000000000000 | 0000000000000000 | 00000000 | 00000000
+       		  32b	            |	     16b       |        SI(16b)
+                       		    |		       |    8b    |  SIL(8b)</PRE>
+	<P>
+	  <a name="a_kurs0104" id="a_kurs0104">Tak, w DOSie</a>
+	 <em class="wazne">można używać rejestrów 32-bitowych</em> (o ile posiada się
+	80386 lub nowszy). Można nawet 64-bitowych, jeśli tylko posiada się właściwy procesor.</P>
+	<P>
+	Jedna ważna uwaga - między nazwami rejestrów może pojawić się dwukropek w dwóch różnych
+	znaczeniach:</P>
+	<UL>
+	<LI>zapis <q>DX : AX</q> (lub 2 dowolne zwykłe rejestry) będzie oznaczać liczbę,
+	której starsza część znajduje się w rejestrze po lewej stronie (DX), a młodsza - w
+	tym z prawej (AX). Wartość liczby wynosi DX*65536 + AX.<BR></LI>
+	<LI>zapis <q>CS : SI</q> (rejestr segmentowy + dowolny zwykły) będzie najczęściej oznaczać wskaźnik
+	do jakiegoś obiektu w pamięci (o pamięci opowiem następnym razem). Rejestr segmentowy
+	zawiera oczywiście segment, w którym znajduje się ów obiekt, a rejestr zwykły -
+	<span lang="en">offset</span> (przesunięcie, adres w tym segmencie) tegoż obiektu.<BR></LI>
+	</UL>
+	<P>
+	Na razie nie musicie się przejmować tymi dwukropkami. Mówię to tylko dlatego, żebyście
+	nie byli zaskoczeni, gdyż w przyszłości się pojawią.</P>
+	<P>
+   Programista może odnosić się bezpośrednio do wszystkich wymienionych rejestrów, z wyjątkiem
+   *IP oraz flag procesora (z wyjątkami).</P>
+	<P>
+	Jak widać po ich rozmiarach, do rejestrów 8-bitowych można wpisać liczbę z przedziału
+	0-255 (lub od -128 do 127, gdy najwyższy, siódmy bit służy nam jako bit oznaczający
+	znak liczby), w 16-bitowych zmieszczą się liczby 0-65535 (od -32768 do 32767), a w
+	32-bitowych - liczby od 0 do 4.294.967.295 (od -2.147.483.648 do 2.147.483.647)
+   </P>
+   Dobrym, choć trudnym w odbiorze źródłem informacji są:
+   <cite lang="en">Intel Architecture Software Developer's Manual</cite> (IASDM)
+    dostępny <em class="wazne">ZA DARMO</em> ze
+   	<A class="intel_link" href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" hreflang="en">stron Intela</A>
+
+   oraz <em class="wazne">DARMOWE</em> podręczniki <cite lang="en">AMD64 Architecture
+   	Programmer's Manual</cite>
+ <A class="amd_link" href="http://developer.amd.com/Resources/documentation/guides/Pages/default.aspx" hreflang="en">firmy
+	<acronym title="Advanced Micro Devices" lang="en">AMD</acronym></A><BR>
+
+<br><br>
+
+
+<!-- ###################################################################### -->
+<BR><HR>
+<h2 class="nag">Pisanie i kompilowanie (asemblowanie) swoich programów</h2>
+
+<P>Jak pisać programy w asemblerze?</P>
+<P>   Należy zaopatrzyć się w:</P>
+<UL>
+
+   <LI> Edytor tekstu, mogący zapisywać pliki formatu TXT (bez formatowania), na przykład
+	 <span lang="en">Programmer's File Editor, Quick Editor, The Gun</span> (wszystkie są na
+	<A HREF="http://www.movsd.com/" hreflang="en">www.movsd.com</A>) czy zwykły Notatnik</LI>
+   <LI> Kompilator języka asembler (patrz dalej)</LI>
+   <LI> Odpowiedni program łączący (kosolidator, ang. <span class="b" lang="en">linker</span>),
+	chyba że kompilator ma już taki wbudowany, jak na przykład A86, NASM lub FASM (patrz dalej)</LI>
+</UL>
+ <P>  Wtedy wystarczy napisać w edytorze tekstu plik zawierający komendy procesora (o tym
+   później), zapisać go z rozszerzeniem .ASM, po czym użyć kompilatora, aby
+   przetworzyć program na kod rozumiany przez procesor. </P>
+
+
+<P>
+ Jakiego kompilatora użyć?</P>
+<P>
+   Istnieje wiele kompilatorów języka asembler. Do najpopularniejszych należą
+   <span lang="en">Turbo asembler</span>
+   firmy Borland, <span lang="en">Microsoft Macro asembler</span> (MASM),
+   <span lang="en">Netwide asembler Project</span> (NASM), A86/A386,
+   NBASM, FASM, HLA.</P>
+<P>
+   Można je ściągnąć z internetu:
+	<BR><a href="#a_kurs0104_1" class="bezdruk">(przeskocz adresy stron kompilatorów)</a></P>
+<UL>
+    <LI>Strona główna NASMa: <A HREF="http://sourceforge.net/projects/nasm" hreflang="en"
+    	>sf.net/projects/nasm</A></LI>
+    <LI>A86 z <A HREF="http://eji.com" hreflang="en">eji.com</A></LI>
+    <LI><span lang="en">Flat asembler</span> (FASM):
+    	 <A HREF="http://www.flatasembler.net" hreflang="en">flatasembler.net</A></LI>
+    <LI>MASM z <A HREF="http://webster.cs.ucr.edu" hreflang="en">Webster.cs.ucr.edu</A> lub z
+	<A HREF="http://www.movsd.com" hreflang="en">www.movsd.com</A> (wersje 32-bitowe)</LI>
+    <LI>HLA <A HREF="http://webster.cs.ucr.edu" hreflang="en">Webster.cs.ucr.edu</A>
+	</LI>
+</UL>
+<P>
+	<a name="a_kurs0104_1" id="a_kurs0104_1">Po skompilowaniu pliku</a> z kodem źródłowym
+	należy użyć programu łączącego, dostępnego zwykle z odpowiednim kompilatorem
+	(na przykład tlink z tasm, link z masm).
+</P>
+
+<!-- ###################################################################### -->
+<P>
+Mamy więc już wszystko, co potrzeba. Zaczynamy pisać. Będę tutaj używał składni Turbo
+ asemblera zgodnego z MASMem oraz FASMa i NASMa.
+</P>
+	<BR><a href="#a_kurs0105" class="bezdruk">(przeskocz program w wersji TASM)</a>
+<PRE title="wersja TASM">
+	; wersja TASM
+	.model tiny
+	.code
+	org 100h
+
+	start:
+		mov	ah, 9
+		mov	dx, offset info
+		int	21h
+
+		mov	ah, 0
+		int	16h
+
+		mov	ax, 4C00h
+		int	21h
+
+	info	db	&quot;Czesc.$&quot;
+
+	end start</PRE>
+
+<hr>
+<P><a name="a_kurs0105" id="a_kurs0105">Teraz wersja NASM:</a></P>
+	<BR><a href="#a_kurs0106" class="bezdruk">(przeskocz program w wersji NASM)</a>
+<PRE title="wersja NASM">
+	; wersja NASM
+
+	; nie ma &quot;.model&quot; ani &quot;.code&quot;
+	; tu można wstawić:
+	; section .text
+	; aby dać znać NASMowi, że to będzie w sekcji kodu.
+	; Nie jest to jednak wymagane, bo to jest sekcja domyślna.
+
+	org 100h
+
+	start:				; nawet tego NASM nie wymaga
+		mov	ah, 9
+		mov	dx, info	; nie ma słowa &quot;offset&quot;
+		int	21h
+
+		mov	ah, 0
+		int	16h
+
+		mov	ax, 4C00h
+		int	21h
+
+	info	db	&quot;Czesc.$&quot;
+
+	; nie ma &quot;end start&quot;</PRE>
+
+<hr>
+<P><a name="a_kurs0106" id="a_kurs0106">Teraz wersja FASM</a></P>
+	<BR><a href="#a_kurs0107" class="bezdruk">(przeskocz program w wersji FASM)</a>
+<PRE title="wersja FASM">
+	; wersja FASM
+
+	format binary
+
+	; nie ma &quot;.model&quot; ani &quot;.code&quot;
+	org 100h
+
+	start:				; nawet tego FASM nie wymaga
+		mov	ah, 9
+		mov	dx, info	; nie ma słowa &quot;offset&quot;
+		int	21h
+
+		mov	ah, 0
+		int	16h
+
+		mov	ax, 4C00h
+		int	21h
+
+	info	db	&quot;Czesc.$&quot;
+
+	; nie ma &quot;end start&quot;</PRE>
+
+<hr>
+<P><a name="a_kurs0107" id="a_kurs0107">Bez paniki!</a>
+ Teraz omówimy dokładnie, co każda linia robi.</P>
+<UL>
+
+ <LI>linie lub napisy zaczynające się średnikiem<BR>
+	<P>
+ 	Traktowane są jako komentarze i są
+	całkowicie ignorowane przy kompilacji. Rozmiar skompilowanego programu wynikowego nie zależy od ilości
+	komentarzy. Dlatego najlepiej wstawiać tyle komentarzy, aby
+	inni (również my) mogli później zrozumieć nasz kod.</P></LI>
+
+ <LI><P><CODE lang="en">.model tiny</CODE> (pamiętajcie o kropce) lub
+ 	 <CODE>format <span lang="en">binary</span></CODE> (w FASMie)</P>
+     Wskazuje kompilatorowi rodzaj programu. Jest kilka takich dyrektyw:
+  <UL>
+   <LI><span lang="en">tiny</span>: kod i dane mieszczą się w jednym 64kB segmencie. Typowy dla programów typu .com </LI>
+   <LI><span lang="en">small</span>: kod i dane są w różnych segmentach, ale obydwa są mniejsze od 64kB </LI>
+   <LI><span lang="en">medium</span>: kod może być &gt; 64kB, ale dane muszą być &lt; 64kB </LI>
+   <LI><span lang="en">compact</span>: kod musi być &lt; 64kB, dane mogą mieć więcej niż 64kB </LI>
+   <LI><span lang="en">large</span>: kod i dane mogą być &gt; 64kB, ale tablice muszą być &lt; 64kB </LI>
+   <LI><span lang="en">huge</span>: kod, dane i tablice mogą być &gt; 64kB </LI>
+  </UL><BR><BR></LI>
+
+ <LI><CODE lang="en">.code</CODE> (też z kropką)<BR>
+	<P>
+     Wskazuje początek segmentu, gdzie znajduje się kod programu. Można jednak w tym segmencie
+     umieszczać dane, ale należy to robić tak, aby nie stały się one częścią programu. Zwykle
+     wpisuje się je za ostatnią komendą kończącą program. Procesor przecież nie wie, co jest pod
+     danym adresem i z miłą chęcią potraktuje to coś jako instrukcję, co może prowadzić do
+     przykrych konsekwencji. Swoje dane umieszczajcie tak, aby w żaden sposób strumień
+     wykonywanych instrukcji nie wszedł na nie.<BR>
+     Są też inne dyrektywy: <code>.data</code>, deklarująca początek segmentu z danymi oraz
+      <code lang="en">.stack</code>,
+     deklarująca segment stosu (o tym później), której nie można używać w programach typu
+     <q>.com</q>, gdzie stos jest automatycznie ustawiany.</P></LI>
+
+ <LI><CODE>org 100h</CODE> (bez kropki)<BR>
+	<P>
+     Ta linia mówi kompilatorowi, że nasz kod będzie (dopiero po uruchomieniu!) znajdował się
+     pod adresem 100h (256 dziesiętnie) w swoim segmencie. To jest typowe dla programów .com.
+     DOS, uruchamiając taki program, szuka wolnego segmentu i kod programu umieszcza dopiero
+     pod adresem (czasami zwanym offsetem - przesunięciem) 100h.<BR>
+     Co jest więc wcześniej? Wiele ciekawych informacji, z których chyba najczęściej używaną jest
+     linia poleceń programu (parametry uruchomienia, na przykład różne opcje itd.).<BR>
+     Dyrektywa <code>org</code> podana na początku kodu NIE wpływa na rozmiar programu, ułatwia kompilatorowi
+     określenie adresów różnych etykiet (w tym danych) znajdujących się w programie.<BR>
+     Jeśli chcemy tworzyć programy typu .com, należy zawsze podać <q>org 100h</q> i opcję /t dla
+     Turbo Linkera.</P></LI>
+
+ <LI><q><CODE>start:</CODE></q> (z dwukropkiem) i <q><CODE>end start</CODE></q> (bez dwukropka)<BR>
+	<P>
+     Mówią kompilatorowi, gdzie są odpowiednio: początek i koniec programu.</P></LI>
+
+ <LI><CODE>mov ah,9</CODE><BR>
+	<P>
+     Do 8-bitowego rejestru AH (górnej części 16-bitowego AX) wstaw
+      (MOV = <span lang="en">move</span>, przesuń)
+      wartość 9. Po co i czemu akurat 9? Zaraz zobaczymy.</P>
+
+     <P>Najpierw powiem o czymś innym: komenda <code>MOV</code> ma ważne ograniczenia:</P>
+  <OL>
+   <LI>nie można skopiować jedną komendą <code>MOV</code> komórki pamięci do innej komórki pamięci, czyli
+      takie coś:
+    <PRE>		mov	[a], [b]</PRE>
+      (gdzie a i b - dwie zmienne w pamięci) jest <span class="b">zabronione</span>.<BR>
+      O tym, co oznaczają nawiasy kwadratowe, czyli o adresowaniu zmiennych w pamięci - następnym razem.
+	<br><br></LI>
+
+   <LI>nie można skopiować jedną komendą <code>MOV</code> jednego rejestru segmentowego (cs, ds, es, ss, fs, gs)
+       do innego rejestru segmentowego, czyli działanie
+    <PRE>		mov	es, ds</PRE>
+      jest <span class="b">zabronione</span>.<br><br></LI>
+
+   <LI>Nie można do rejestru segmentowego bezpośrednio wpisać jakieś wartości, czyli nie można
+	<PRE>		mov	ds, 0</PRE>
+	ale można:
+ <PRE>		mov	bx, 0
+		mov	ds, bx</PRE>
+   </OL></LI>
+
+ <LI><CODE>mov dx,offset info</CODE><BR>
+	<P>
+     Do rejestru danych (DX, 16-bitowy) wstaw <span lang="en">offset</span> (adres względem
+     początku segmentu) etykiety <q>info</q>. Można obliczać adresy nie tylko danych, ale etykiet
+     znajdujących się w kodzie programu.</P></LI>
+
+ <LI><CODE>int 21h</CODE><BR>
+	<P>
+     INT = <span lang="en">interrupt</span> = przerwanie. Nie jest to jednak znane na przykład z
+	kart dźwiękowych przerwanie typu <acronym lang="en" title="Interrupt Request">IRQ</acronym>.
+     Wywołując przerwanie 21h (33 dziesiętnie) uruchamiamy jedną z funkcji DOSa.
+     Którą? O tym zazwyczaj mówi rejestr AX. W
+	<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+	>spisie przerwań Ralfa <span lang="en">Brown</span>'a
+	(<acronym lang="en" title="Ralf Brown's Interrupt List">RBIL</acronym>)</A> patrzymy:</P>
+	<a href="#a_kurs0108" class="bezdruk">(przeskocz opis int 21h, ah=9)</a>
+ <PRE title="int 21h, ah=9" lang="en">		INT 21 - DOS 1+ - WRITE STRING TO STANDARD OUTPUT
+		AH = 09h
+		DS:DX -> $-terminated string</PRE>
+	<P>
+     <a name="a_kurs0108" id="a_kurs0108">Już widzimy</a>, czemu do AH poszła wartość 9. Chcieliśmy uruchomić
+	 funkcję, która wypisuje na
+     na ekran ciąg znaków zakończony znakiem dolara. Adres tego ciągu musi się znajdować w parze
+     rejestrów: DS wskazuje segment, w którym znajduje się ten ciąg, a DX - jego adres w tym
+     segmencie. Dlatego było <code>mov dx,offset info</code>.</P>
+	<P>
+     Zaraz, zaraz! Ale przecież my nic nie robiliśmy z DS, a dane znajdują się przecież w segmencie
+     kodu! I to działa?<BR>
+     Oczywiście! Programy typu .com są małe. Tak małe, że mieszczą się w jednym segmencie
+	pamięci.
+     Dlatego przy ich uruchamianiu DOS ustawia nam CS=DS=ES=SS. Nie musimy się więc o to martwić.
+	</P><P>
+     Opis podstawowych funkcji kilku przerwań znajdziecie na jednej z moich podstron,
+	poświeconej <a href="dos_int.htm" hreflang="pl">najczęściej stosowanym funkcjom przerwań</a>,
+	gdzie znajdziecie także instrukcje budowania RBIL.<br>
+	</P></LI>
+
+ <LI><CODE>mov ah,0</CODE><BR>
+	<P>
+     Do rejestru AH wpisz 0. Czemu? Zaraz zobaczymy. Ale najpierw wspomnę o czymś innym. Otóż,</P>
+     <PRE>		mov	rejestr, 0</PRE>
+     <P>nie jest najlepszym sposobem na wyzerowanie danego rejestru. Szybsze lub krótsze są dwa inne:</P>
+     <PRE>
+		xor	rej1, rej1 ; 1 xor 1 = 0 oraz 0 xor 0 = 0.
+				   ; Stąd &nbsp; &quot;coś XOR to_samo_coś&quot;
+				   ; zawsze daje 0.
+
+		sub	rej1, rej1	; sub=<span lang="en">subtract</span>=odejmij.
+					; rej1 - rej1 = 0</PRE>
+     <P>Ja zwykle używam XOR.</P></LI>
+
+ <LI><CODE>int 16h</CODE><BR>
+	<P>
+     Kolejne przerwanie, więc znowu do listy Ralfa <span lang="en">Brown</span>'a:</P>
+	<a href="#a_kurs0109" class="bezdruk">(przeskocz opis int 16h, ah=0)</a>
+ <PRE title="int 16h, ah=0" lang="en">		INT 16 - KEYBOARD - GET KEYSTROKE
+		AH = 00h
+		Return: AH = BIOS scan code
+			AL = ASCII character</PRE>
+	<P><a name="a_kurs0109" id="a_kurs0109">Ta funkcja pobiera </a>
+     znak z klawiatury i zwraca go w rejestrze AL. Jeśli nie naciśnięto nic,
+     poczeka, aż użytkownik naciśnie.</P></LI>
+
+ <LI><CODE>mov ax,4c00h</CODE><BR>
+	<P>Do rejestru AX wpisujemy wartość 4c00 szesnastkowo.</P></LI>
+
+ <LI><CODE>int 21h</CODE><BR>
+	<P>
+     Znów przerwanie DOSa, funkcja 4ch. Patrzymy do RBIL:</P>
+	<a href="#a_kurs0110" class="bezdruk">(przeskocz opis int 21h, ah=4ch)</a>
+ <PRE title="int 21h, ah=4ch" lang="en">	  INT 21 - DOS 2+ - &quot;EXIT&quot; - TERMINATE WITH RETURN CODE
+		AH = 4Ch
+		AL = return code
+		Return: never returns</PRE>
+	  <P><a name="a_kurs0110" id="a_kurs0110">Jak widzimy, ta funkcja</a>
+      powoduje wyjście z powrotem do DOSa, z numerem błędu (<span lang="en">errorlevel</span>)
+     w AL równym 0. Przyjmuje się, że 0 oznacza, iż program zakończył się bez błędów. Jak widać
+     po rozmiarze rejestru AL (8 bitów), program może wyjść z 2^8=256 różnymi
+     numerami błędu.</P></LI>
+
+ <LI><CODE>info db &quot;Czesc.$&quot;</CODE><BR>
+	<P>
+     Etykietą <q>info</q> opisujemy kilka bajtów, w tym przypadku zapisanych jako ciąg znaków.<BR>
+     A po co znak dolara $? Jak sobie przypomnimy, funkcja 9. przerwania DOSa wypisuje ciąg znaków zakończony
+     właśnie na znak dolara $. Gdyby tego znaczka nie było, DOS wypisywałby różne śmieci z pamięci, aż trafiłby na przypadkowy
+     znak dolara $ nie wiadomo gdzie. O deklarowaniu zmiennych będzie w następnej części.</P></LI>
+
+ <LI><CODE>end start</CODE><BR>
+	<P>Koniec programu.</P></LI>
+
+</UL>
+<P>
+Programik kompilujemy poleceniem:</P>
+<PRE title="kompilacja TASM">
+	tasm naszplik.asm
+	tlink naszplik.obj /t</PRE>
+<P>(opcja /t - utworzy plik typu .com).<BR>
+Jeśli otrzymujecie komunikaty o braku pamięci, możecie wypróbować następujący sposób:</P>
+<PRE title="kompilacja TASMX">
+	tasmx naszplik.asm
+	tlink naszplik.obj /t /3</PRE>
+<P>Dla NASMa kompilacja wygląda tak:</P>
+<PRE title="kompilacja NASM">	nasm -o naszplik.com -f bin naszplik.asm</PRE>
+<P>(-o = nazwa pliku wyjściowego<BR>
+  -f = format pliku. Bin = binarny = na przykład COM lub SYS).</P>
+<P>A dla FASMa:</P>
+<PRE title="kompilacja FASM">	fasm naszplik.asm naszplik.com</PRE>
+
+
+<P>Kompilacja, nawet programu w asemblerze (zwana czasem asemblacją), ma kilka etapów:</P>
+<ul>
+ <li><span lang="en">pre-processing</span> - w tej fazie preprocesor przetwarza dyrektywy takie
+	jak definicje stałych, dołączanie innych plików do kodu, rozwinięcia makr i inne, zanim
+	poda program kompilatorowi do kompilacji<br><br></li>
+ <li>kompilacja - na tym etapie tworzony jest binarny kod programu wynikowego. Podprogram kompilatora
+	sprawdza składnię instrukcji, zmienia je na ich binarne odpowiedniki, przetwarza zmienne na
+	ich binarne odpowiedniki, sprawdza, czy wszystkie wykorzystane symbole (na przykład u nas zmienna
+	<CODE>info</CODE>) są zadeklarowane, sprawdza, czy skoki mieszczą się w granicach i wykonuje
+	inne niezbędne czynności, w tym optymalizację. Pozostawia jednak adresy symboli
+	nieuzupełnione.<br><br></li>
+ <li>linkowanie (konsolidowanie) - na tym etapie następuje sprawdzenie, czy wszystkie
+	symbole pozostawione przez kompilator do uzupełnienia są dostępne w samym programie
+	lub innych plikach podanych linkerowi do połączenia.
+	Jeśli wszystkie symbole są obecne, następuje wstawianie ich adresów do programu wynikowego
+	i wygenerowanie samego programu.
+	</li>
+</ul>
+<p>Jeśli do programu nie dołączamy innych już skompilowanych plików ani bibliotek, to
+niektóre kompilatory nie wymagają osobnego linkera i mogą same sobie poradzić z wygenerowaniem
+programu wyjściowego. Widać to na przykład w wywołaniach NASMa i FASMa powyżej.</p>
+
+<P>Teraz uruchamiamy naszplik.com i cieszymy się swoim dziełem.</P>
+
+<P>Miłego eksperymentowania.</P>
+
+<blockquote>Na świecie jest 10 rodzajów ludzi:<BR>
+ci, którzy rozumieją liczby binarne i ci, którzy nie.</blockquote>
+
+<br><br>
+<div class="bezdruk">
+<a accesskey="4" hreflang="pl" href="a_kurs02.htm">Kolejna część kursu</a> (Alt+4)<br>
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+<BR><HR>
+<h2 class="nag">Ćwiczenia</h2>
+<OL>
+<LI>Poeksperymentujcie sobie, wstawiając z różne znaki do napisu. Na przykład, znaki o kodach
+  ASCII 10 (<span lang="en">Line Feed</span>), 13 (<span lang="en">Carriage Return</span>),
+   7 (<span lang="en">Bell</span>). Pamiętajcie tylko, że znak dolara $ musi być
+  ostatni, dlatego róbcie coś w stylu:
+ <PRE>		info db &quot;Czesc.&quot;, 00, 01, 02, 07, 10, 13, 10, 13, &quot;$&quot;</PRE>
+ </LI>
+</OL>
+
+</BODY></HTML>

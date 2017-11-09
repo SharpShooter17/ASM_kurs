@@ -1,0 +1,447 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Własne biblioteki</TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Tworzenie własnych bibliotek">
+<META NAME="Keywords" CONTENT="biblioteka, lib, asm, assembler, asembler">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Pisanie własnych bibliotek w języku asembler</h1>
+
+
+<P>Pewnie zdarzyło się już wam usłyszeć o kimś innym:<BR>
+<q>Ależ on(a) jest świetnym(ą) programistą(ką)! Nawet pisze własne biblioteki!</q><BR>
+Pokażę teraz, że nie jest to trudne, nie ważne jak przerażającym się to może wydawać.
+Osoby, które przeczytają ten artykuł i zdobędą troszkę wprawy będą mogły mówić:<BR>
+<q>Phi, a co to za filozofia pisać własne biblioteki!</q></P>
+
+<P>Zacznijmy więc od pytania: co powinno się znaleźć w takiej bibliotece?<BR>
+Mogą to być:</P>
+<UL>
+ <LI> Funkcje wejścia i wyjścia, podobnie jak na przykład w języku C</LI>
+ <LI> Funkcje, które już przepisywaliśmy ze 20 razy w różnych programach</LI>
+ <LI> Sprawdzone funkcje, napisane przez kogoś innego, których nie umielibyśmy sami
+      napisać, lub które <q>po prostu mogą się przydać</q></LI>
+</UL>
+
+<P>Co to zaś jest to owa <q>biblioteka</q>?<BR>
+Jest to plik (najczęściej z rozszerzeniem .lib), na który składa
+się skompilowany kod, a więc na przykład pliki .obj. Biblioteka eksportuje na zewnątrz nazwy
+procedur w niej zawartych, aby linker wiedział, jaki adres podać programowi, który chce
+skorzystać z takiej procedury.</P>
+<P>
+Będę w tym artykule używał składni i linii poleceń Turbo Assemblera (TASMa) firmy Borland
+z linkerem TLink i bibliotekarzem TLib oraz NASMa (<span lang="en">Netwide Assembler</span>) i FASMa
+(<span lang="en">Flat Assembler</span> z linkerem ALink
+i darmowym bibliotekarzem znalezionym w Internecie (patrz linki na dole strony).</P>
+<P>
+Napiszmy więc jakiś prosty kod źródłowy. Oto on:</P>
+	<BR><a href="#bibl_tut01" tabindex="1" class="bezdruk">(przeskocz przykładowy moduł biblioteki)</a>
+<PRE title="przykładowy moduł biblioteki">
+; wersja TASM
+
+public _graj_dzwiek
+
+biblioteka_dzwiek	segment	byte	public &quot;bibl&quot;
+assume cs:biblioteka_dzwiek
+
+_graj_dzwiek		proc	far
+
+
+
+; wejście:	BX = żądana częstotliwość dźwięku w Hz, co najmniej 19
+;		CX:DX = czas trwania dźwięku w mikrosekundach
+;
+; wyjście:	CF = 0 - wykonane bez błędów
+;		CF = 1 - błąd: BX za mały
+
+
+
+czasomierz	equ	40h	;numer portu programowalnego czasomierza
+klawiatura	equ	60h	;numer portu kontrolera klawiatury
+
+	pushf			; zachowujemy modyfikowane rejestry
+	push ax
+	push dx
+	push si
+
+
+	cmp bx,19		;najniższa możliwa częstotliwość to ok. 18Hz
+	jb _graj_blad
+
+
+	in   al,klawiatura+1	; port B kontrolera klawiatury
+	or   al,3		; ustawiamy bity: 0 i 1 - włączamy głośnik i
+				; bramkę od licznika nr. 2 czasomierza
+				; do głośnika
+	out  klawiatura+1,al
+
+
+
+	mov si,dx		;zachowujemy DX
+
+	mov dx,12h
+	mov ax,34ddh
+	div bx			;AX = 1193181 / częstotliwość, DX=reszta
+
+	mov dl,al		;zachowujemy młodszy bajt dzielnika
+				; częstotliwości
+
+
+
+	mov al,0b6h
+
+	out czasomierz+3,al	;wysyłamy komendę:
+				; (bity 7-6) wybieramy licznik nr. 2,
+				; (bity 5-4) będziemy pisać najpierw bity 0-7
+				;		 potem bity 8-15
+				;(bity 3-1) tryb 3:generator fali kwadratowej
+				; (bit 0)    licznik binarny 16-bitowy
+
+	mov al,dl		; odzyskujemy młodszy bajt
+	out czasomierz+2,al	; port licznika nr. 2 i bity 0-7 dzielnika
+				; częstotliwości
+	mov al,ah
+	out czasomierz+2,al	; bity 8-15
+
+	mov dx,si		;odzyskujemy DX
+
+
+_graj_pauza:
+	mov ah,86h
+	int 15h			; pauza o długości CX:DX mikrosekund
+
+	jnc _graj_juz
+	dec dx
+	sbb cx,0		; w razie błędu zmniejszamy CX:DX
+	jmp short _graj_pauza
+
+_graj_juz:
+
+	in   al,klawiatura+1
+	and  al,not 3		; zerujemy bity: 0 i 1 - wyłączamy głośnik
+				; i bramkę
+	out  klawiatura+1,al
+
+	pop si			; przywracamy rejestry
+	pop dx
+	pop ax
+	popf
+	clc			; brak błędu
+
+	retf
+
+
+_graj_blad:
+	pop si			; przywracamy rejestry
+	pop dx
+	pop ax
+	popf
+	stc			; błąd
+
+	retf
+
+_graj_dzwiek		endp
+
+biblioteka_dzwiek	ends
+end</PRE>
+<hr>
+<P><a name="bibl_tut01" id="bibl_tut01">Teraz ten sam kod w składni NASMa/FASMa</a>:</P>
+	<BR><a href="#bibl_tut02" class="bezdruk">(przeskocz moduł w składni NASMa/FASMa)</a>
+<PRE title="przykładowy moduł biblioteki w składni NASM/FASM">
+; wersja NASM
+
+global	_graj_dzwiek
+; w FASMie:
+;	format COFF
+;	use16
+; 	PUBLIC _graj_dzwiek
+
+segment	biblioteka_dzwiek	; FASM: section &quot;.text&quot; code
+
+_graj_dzwiek:
+
+
+
+; wejście:	BX = żądana częstotliwość dźwięku w Hz, co najmniej 19
+;		CX:DX = czas trwania dźwięku w mikrosekundach
+;
+; wyjście:	CF = 0 - wykonane bez błędów
+;		CF = 1 - błąd: BX za mały
+
+
+
+czasomierz	equ	40h	;numer portu programowalnego czasomierza
+klawiatura	equ	60h	;numer portu kontrolera klawiatury
+
+	pushf
+	push ax
+	push dx
+	push si
+
+
+	cmp bx,19		;najniższa możliwa częstotliwość to ok. 18Hz
+	jb _graj_blad
+
+
+	in   al,klawiatura+1	; port B kontrolera klawiatury
+	or   al,3		; ustawiamy bity: 0 i 1 - włączamy głośnik i
+				; bramkę od licznika nr. 2 czasomierza
+				; do głośnika
+	out  klawiatura+1,al
+
+
+
+	mov si,dx		;zachowujemy DX
+
+	mov dx,12h
+	mov ax,34ddh
+	div bx			;AX = 1193181 / częstotliwość, DX=reszta
+
+	mov dl,al		;zachowujemy młodszy bajt dzielnika
+				; częstotliwości
+
+
+
+	mov al,0b6h
+
+	out czasomierz+3,al	;wysyłamy komendę:
+				; (bity 7-6) wybieramy licznik nr. 2,
+				; (bity 5-4) będziemy pisać najpierw bity 0-7
+				;		 potem bity 8-15
+				;(bity 3-1) tryb 3:generator fali kwadratowej
+				; (bit 0)    licznik binarny 16-bitowy
+
+	mov al,dl		; odzyskujemy młodszy bajt
+	out czasomierz+2,al	; port licznika nr. 2 i bity 0-7 dzielnika
+				; częstotliwości
+	mov al,ah
+	out czasomierz+2,al	; bity 8-15
+
+	mov dx,si		;odzyskujemy DX
+
+
+_graj_pauza:
+	mov ah,86h
+	int 15h			; pauza o długości CX:DX mikrosekund
+
+	jnc _graj_juz
+	dec dx
+	sbb cx,0		; w razie błędu zmniejszamy CX:DX
+	jmp short _graj_pauza
+
+_graj_juz:
+
+	in   al,klawiatura+1
+	and  al,~3		; zerujemy bity: 0 i 1 - wyłączamy głośnik
+				; i bramkę
+				; w FASMie: <q>AND AL, not 3</q>
+	out  klawiatura+1,al
+
+	pop si
+	pop dx
+	pop ax
+	popf
+	clc
+
+	retf
+
+
+_graj_blad:
+	pop si
+	pop dx
+	pop ax
+	popf
+	stc
+
+	retf
+</PRE>
+
+
+<P><a name="bibl_tut02" id="bibl_tut02">Jest to moja procedura wytwarzająca</a>
+ dźwięk w głośniczku (patrz <a href="spkr_tut.htm" hreflang="pl">artykuł o programowaniu głośniczka</a>).
+Trochę tego jest, co? Ale jest tu dużo spraw, które można omówić.</P>
+
+<P>Zacznijmy więc po kolei:</P>
+<OL>
+ <LI> <CODE lang="en">public... / global...</CODE><BR>
+      <P>Funkcje, które mają być <q>widoczne na zewnątrz</q> tego pliku, a więc możliwe do użycia przez
+      inne programy, muszą być zadeklarowane jako <q lang="en">public</q> (TASM/FASM)
+       (w NASMie: <q lang="en">global</q>). To jest <q>na wszelki wypadek</q>.
+      Niektóre kompilatory domyślnie traktują wszystkie symbole jako publiczne, inne nie.
+      Jeśli w programie będziemy chcieli korzystać z takiej funkcji, należy ją zadeklarować
+      jako <q>extrn</q> (TASM/FASM) lub <q>extern</q> (NASM).
+	</P></LI>
+ <LI> Deklaracja segmentu<BR>
+      <P>Żaden przyzwoity kompilator nie pozwoli na pisanie kodu poza jakimkolwiek segmentem
+      (no chyba, że domyślnie zakłada segment kodu, jak NASM).
+      Normalnie, w <q>zwykłych</q> programach, np typu .com, rolę tę pełni dyrektywa
+      <q lang="en">.code</q>.
+	</P></LI>
+ <LI> <CODE>assume</CODE> <BR>
+      <P>Mówimy kompilatorowi, że rejestr CS będzie wskazywał na ten segment</P></LI>
+ <LI> Gwiazdki lub inne elementy oddzielające (tu usunięte)<BR>
+      <P>Mogą się wydawać śmieszne lub niepotrzebne, ale gdy liczba procedur w pliku zaczyna
+      sięgać 10-20, to NAPRAWDĘ zwiększają czytelność kodu, oddzielając procedury, dane itd.
+	</P></LI>
+ <LI> Deklaracja procedury (wcześniej zadeklarowanej jako publiczna)<BR>
+      <P>Znak podkreślenia z przodu jest tylko po to, by w razie czego nie był identyczny z jakąś
+      etykietą w programie korzystającym z biblioteki. Deklaracja jest typu <q>far</q>, żeby
+      zmienić CS na bieżący segment i uniknąć kłopotów z 64kB limitem długości skoku
+      (konkretnie to są to +/- 32kB).</P></LI>
+ <LI> To, czego procedura oczekuje i to, co zwraca.<BR>
+      <P>Jedną procedurę łatwo zapamiętać. Ale co zrobić, gdy jest ich już 100? Analizować kod każdej,
+      aby sprawdzić, co robi, bo akurat szukamy takiej jednej....? No przecież nie.</P></LI>
+ <LI> Dobrą techniką programowania jest deklaracja stałych w stylu <q>equ</q> (lub #define w C).
+      <P>Zamiast nic nie znaczącej liczby można użyć wiele znaczącego zwrotu, co przyda się dalej
+      w kodzie. I nie kosztuje to ani jednego bajtu. Oczywiście, ukrywa to część kodu (tutaj:
+      numery portów), ale w razie potrzeby zmienia się tę wielkość tylko w 1 miejscu, a nie
+      w 20.</P></LI>
+ <LI> <CODE>push...</CODE><BR>
+      <P>Poza wartościami zwracanymi nic nie może być zmienione! Nieprzyjemnym uczuciem byłoby
+      spędzenie kilku godzin przy odpluskwianiu (debugowaniu) programu tylko dlatego, że ktoś
+      zapomniał zachować jakiegoś rejestru, prawda?</P></LI>
+ <LI> Sprawdzanie warunków wejścia, czy są prawidłowe. Zawsze należy wszystko przewidzieć.
+	<BR><BR></LI>
+ <LI> Kod procedury. Z punktu widzenia tego artykułu jego treść jest dla nas nieistotna.
+	<BR><BR></LI>
+ <LI> Punkt(y) wyjścia<BR>
+      <P>Procedura może mieć dowolnie wiele punktów wyjścia. Tutaj zastosowano
+      dwa, dla dwóch różnych sytuacji:</P>
+      <OL>
+       <LI> parametr był dobry, procedura zakończyła się bez błędów</LI>
+       <LI> parametr był zły, zwróć informację o błędzie</LI>
+      </OL><BR></LI>
+ <LI> Koniec procedury, segmentu i pliku źródłowego. Słowo <q>end</q> nie zawsze jest konieczne, ale
+      nie zaszkodzi. Wskazuje, gdzie należy skończyć przetwarzanie pliku.<BR><BR></LI>
+</OL>
+
+<P>Mamy więc już plik źródłowy. Co z nim zrobić? Skompilować, oczywiście!</P>
+<PRE>	tasm naszplik.asm /z /m</PRE>
+<P>(/z - wypisz linię, w której wystąpił błąd<BR>
+  /m - pozwól na wielokrotne przejścia przez plik)<BR>
+lub, dla NASMa:</P>
+<PRE>	nasm -f obj -o naszplik.obj naszplik.asm</PRE>
+<P>(-f - określ format pliku wyjściowego<BR>
+  -o - określ nazwę pliku wyjściowego)<BR>
+lub, dla FASMa:</P>
+<PRE>	fasm naszplik.asm naszplik.obj</pre>
+
+<P>
+Mamy już plik <q>naszplik.obj</q>. W pewnym sensie on już jest biblioteką! I można go używać w innych
+programach, na przykład w pliku <q>program2.asm</q> mamy:</P>
+<PRE>
+	...
+	extrn _graj_dzwiek:far		; NASM: extern _graj_dzwiek
+					; FASM: extrn _graj_dzwiek
+
+		...
+		...
+		mov bx,440
+		mov cx,0fh
+		mov dx,4240h
+		call far ptr _graj_dzwiek ; NASM: call far _graj_dzwiek
+					; FASM: call _graj_dzwiek
+		...</PRE>
+
+<P>I możemy teraz zrobić:</P>
+<PRE>
+	tasm program2.asm /z /m
+	tlink program2.obj naszplik.obj</PRE>
+<P>lub, dla NASMa:</P>
+<PRE>
+	nasm -f obj -o program2.obj program2.asm
+	alink program2.obj naszplik.obj -c- -oEXE -m-</PRE>
+<p>lub, dla FASMa:</P>
+<PRE>
+	fasm program2.asm program2.obj
+	alink program2.obj naszplik.obj -c- -oEXE -m-</PRE>
+
+
+<P>a linker zajmie się wszystkim za nas - utworzy plik <q>program2.exe</q>, zawierający także
+<q>naszplik.obj</q>. Jaka z tego korzyść? Plik <q>program2.asm</q> może będzie zmieniany w przyszłości
+wiele razy, ale <q>naszplik.asm/.obj</q> będzie ciągle taki sam. A w razie chęci zmiany procedury
+_graj_dzwiek wystarczy ją zmienić w 1 pliku i tylko jego ponownie skompilować, bez potrzeby
+wprowadzania tej samej zmiany w kilkunastu innych programach. Te programy wystarczy
+tylko ponownie skompilować z nową <q>biblioteką</q>, bez jakichkolwiek zmian kodu.</P>
+
+<P>
+No dobra, ale co z plikami .lib?<BR>
+Otóż są one odpowiednio połączonymi plikami .obj. I wszystko działa tak samo.<BR>
+<BR>Ale jak to zrobić?<BR>
+Służą do tego specjalne programy, nazywane <q lang="en">librarian</q> (bibliotekarz). W pakiecie TASMa
+znajduje się program <q>tlib.exe</q>. Jego właśnie użyjemy (działa jak LLIB i wszystko
+robimy tak samo). Pliki .obj, które chcemy połączyć w
+bibliotekę można podawać na linii poleceń, ale jest to męczące, nawet jeśli napisze się plik
+wsadowy <q>tlib.bat</q> uruchamiający tlib. My skorzystamy z innego rozwiązania.<BR>
+ Programowi można na linii poleceń podać, aby komendy czytał z jakiegoś pliku. I to właśnie
+zrobimy. Piszemy plik <q>tlib.bat</q>:</P>
+<PRE>	tlib.exe naszabibl.lib @lib.txt</PRE>
+<P>i plik <q>lib.txt</q> (zwykłym edytorem tekstu):</P>
+
+<PRE>
+	+- ..\obj\pisz.obj &amp;
+	+- ..\obj\wej.obj &amp;
+	+- ..\obj\procesor.obj &amp;
+	+- ..\obj\losowe.obj &amp;
+	+- ..\obj\f_pisz.obj &amp;
+
+	+- ..\obj\dzwiek.obj &amp;
+	+- ..\obj\f_wej.obj &amp;
+	+- ..\obj\fn_pisz.obj &amp;
+	+- ..\obj\fn_wej.obj</PRE>
+
+<P>(użyłem tutaj nazw modułów, które składają się na moją bibliotekę).<BR>
+<q>+-</q> oznacza <q>zamień w pliku dany moduł</q><BR>
+<q>&amp;</q>  oznacza <q>sprawdzaj jeszcze w kolejnej linijce</q><BR>
+Przy pierwszym tworzeniu można użyć <q>+</q> zamiast <q>+-</q>, aby uniknąć ostrzeżeń o uprzedniej
+nieobecności danego modułu w bibliotece.<BR>
+Teraz uruchamiamy już tylko <q>tlib.bat</q> a w razie potrzeby zmieniamy tylko <q>lib.txt</q>.</P>
+
+<P>
+Gdzie zdobyć narzędzia:</P>
+<OL>
+ <LI> <A HREF="http://sourceforge.net/projects/nasm" hreflang="en"
+ 	 >NASM</A>
+ 	 </LI>
+ <LI><A HREF="http://alink.sf.net/" hreflang="en">Alink</A></LI>
+ <LI>Lib (LLIB, a <em class="wazne">nie</em> ten z pakietu Borlanda czy
+ 	<span lang="en">Microsoft</span>-u):<BR>
+	 <A HREF="http://www.dunfield.com/downloads.htm" hreflang="en"
+	 >www.dunfield.com/downloads.htm</A> (szukaj SKLIB31.ZIP)<BR>
+	<A HREF="http://www2.inf.fh-rhein-sieg.de/~skaise2a/ska/sources.html" hreflang="en"
+	>www2.inf.fh-rhein-sieg.de/~skaise2a/ska/sources.html</A><BR>
+	Jeśli tam go nie ma, to poszukajcie na stronach
+	<A HREF="http://www.freedos.org" hreflang="en" lang="en">FreeDOS</a>-a
+  	</LI>
+</OL>
+
+<P> Kopia mojej biblioteki powinna znajdować się na stronach, gdzie znaleźliście ten kurs.
+</P>
+
+<P>Miłej zabawy.</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+
+</BODY></HTML>

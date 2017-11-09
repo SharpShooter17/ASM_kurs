@@ -1,0 +1,250 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Obsługa myszy </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Obsługa myszy w asemblerze">
+<META NAME="Keywords" CONTENT="mysz, int 33h, assembler, asm, asembler">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Obsługa myszy w asemblerze</h1>
+
+<P>
+W tej części dowiemy się, jak dodać w naszych programach obsługę myszy.<BR>
+Do naszych celów potrzebne nam będą załadowane sterowniki myszy w pamięci oraz przerwanie
+int 33h.</P>
+<P>
+Zapoznajmy się z kilkoma podstawowymi funkcjami tegoż przerwania (patrzymy oczywiście w listę
+przerwań Ralfa <span lang="en">Brown</span>'a -
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html"
+ hreflang="en"><acronym title="Ralf Brown's Interrupt List" lang="en">RBIL</acronym></A>):</P>
+	<BR><a href="#mysz_tut01" tabindex="1" class="bezdruk">(przeskocz opis funkcji int 33h)</a>
+
+<PRE lang="en" title="int 33h, ax=0,1,2,4,6">
+	INT 33 - MS MOUSE - RESET DRIVER AND READ STATUS
+	        AX = 0000h
+	Return: AX = status
+            		0000h hardware/driver not installed
+            		FFFFh hardware/driver installed
+        	BX = number of buttons
+            		0000h other than two
+            		0002h two buttons (many drivers)
+            		0003h Mouse Systems/Logitech three-button mouse
+            		FFFFh two buttons
+
+	INT 33 - MS MOUSE v1.0+ - SHOW MOUSE CURSOR
+	        AX = 0001h
+
+	INT 33 - MS MOUSE v1.0+ - HIDE MOUSE CURSOR
+	        AX = 0002h
+
+	INT 33 - MS MOUSE v1.0+ - POSITION MOUSE CURSOR
+	        AX = 0004h
+	        CX = column
+	        DX = row
+
+	INT 33 - MS MOUSE v1.0+ - RETURN BUTTON RELEASE DATA
+	        AX = 0006h
+	        BX = button number (see #03169)
+	Return: AX = button states (see #03168)
+	        BX = number of times specified button has been released since
+	        	 last call
+	        CX = column at time specified button was last released
+	        DX = row at time specified button was last released
+
+	(Table 03169)
+	Values for mouse button number:
+ 	0000h  left
+ 	0001h  right
+ 	0002h  middle</PRE>
+
+<P><a name="mysz_tut01" id="mysz_tut01">Tyle powinno nam wystarczyć</a>.
+ Są też funkcje, które na przykład definiują zasięg poziomy i pionowy
+kursora (można ustawić tak, że kursor będzie się mógł poruszać tylko w wyznaczonym <q>oknie</q>),
+ale tymi nie będziemy się zajmować.
+</P>
+
+<P>
+Na dobry początek resetujemy sterownik i sprawdzamy, czy w ogóle jest jakaś mysz zainstalowana
+(jeszcze wcześniej można byłoby sprawdzić, czy sam sterownik nie jest procedurą, która nic
+nie robi, ale pominę to). Kod jest wyjątkowo krótki:</P>
+<PRE>
+	xor	ax, ax
+	int	33h			; sprawdzamy, czy jest mysz
+	or	ax, ax
+	jz	brak_myszy</PRE>
+
+<P>Jak było widać wcześniej, pokazanie kursora nie jest trudne i sprowadza się do:</P>
+<PRE>
+	mov	ax, 1
+	int	33h			; pokaż kursor</PRE>
+
+<P>Do szczęścia brakuje nam już tylko sprawdzenie, czy i gdzie naciśnięto jakiś przycisk. Do tego
+posłuży nam funkcja numer 6. Wystarczy w BX podać interesujący nas przycisk, a w CX i DX
+powinniśmy otrzymać współrzędne (dobrze jest przed rozpoczęciem pracy wywołać raz tę funkcję
+dla wszystkich przycisków, aby wyzerować liczniki naciśnięć). Przykład:</P>
+<PRE>
+	mov	ax, 6
+	xor	bx, bx
+	int	33h
+	or	bx, bx
+	jz	nie_wcisnieto_lewego
+
+	mov	[kolumna], cx
+	mov	[wiersz], dx</PRE>
+
+<P>
+Nie ma w tym dużo wysiłku, na szczęście. Wszystko za nas robi sterownik, a my tylko potem
+sprawdzamy rejestry.<BR>
+Dlatego też od razu przejdę do finału tego artykułu i zaprezentuję program, w którym zawarłem
+wszystko to, o czym mówiłem. Zadaniem programu jest nic innego, jak tylko wyświetlenie
+odpowiedniego napisu, gdy użytkownik naciśnie jakiś klawisz myszki (naciśnięcie czegoś na
+klawiaturze spowoduje wyjście z programu). Napis zostanie wyświetlony w miejscu, gdzie
+naciśnięto przycisk.
+</P>
+<P>
+Oto kod:</P>
+	<BR><a href="#mysz_tut02" class="bezdruk">(przeskocz kod programu)</a>
+<PRE title="Program wyświetlający napis w miejscu kliknięcia">
+; Program wyświetlający napis w miejscu, gdzie został naciśnięty
+; klawisz myszki.
+;
+; POD WINDOWS URUCHAMIAĆ W TRYBIE PEŁNOEKRANOWYM
+;
+;
+; Autor: Bogdan D.
+; kontakt: bogdandr (at) op (dot) pl
+;
+; nasm -O999 -o mysz.com -f bin mysz.asm
+
+
+org 100h
+
+	xor	ax, ax			; AX = 0
+	int	33h			; sprawdzamy, czy jest mysz
+	or	ax, ax
+	jnz	mysz_ok
+
+	mov	dx, nie_ma_myszy
+	mov	ah, 9
+	int	21h
+
+	mov	ax, 4c01h		; zwracamy kod błędu=1
+	int	21h
+
+
+mysz_ok:
+	mov	ax, 3
+	int	10h			; czyścimy ekran
+
+	mov	ax, 1
+	int	33h			; pokazujemy kursor myszki
+
+					; zerujemy liczniki naciśnięć:
+	mov	ax, 6
+	xor	bx, bx			; lewy przycisk
+	int	33h
+
+	mov	ax, 6
+	mov	bx, 1			; prawy przycisk
+	int	33h
+
+petla:
+	mov	ah, 1
+	int	16h		; czy naciśnięto klawisz na klawiaturze?
+	jnz	koniec		; jeśli tak, to wychodzimy z programu
+
+	mov	ax, 6
+	xor	bx, bx			; sprawdzamy lewy przycisk
+	int	33h
+
+	or	bx, bx		; jeśli naciśnięto, to idziemy coś wyświetlić
+	jnz	pokaz_l
+
+	mov	ax, 6
+	mov	bx, 1			; sprawdzamy prawy przycisk
+	int	33h
+
+	or	bx, bx		; jeśli naciśnięto, to idziemy coś wyświetlić
+	jnz	pokaz_p
+
+	jmp	short petla
+
+pokaz_l:
+				; wiemy, ze CX=kolumna, DX=wiersz, gdzie
+				;naciśnięto klawisz, ale to są numery pikseli
+				; Aby otrzymać kolumnę i wiersz, dzielimy je
+				; przez 8 (bo jest 8 pikseli/znak):
+	shr	dx, 3
+	shr	cx, 3
+
+	mov	ah, 2			; funkcja ustawiania kursora
+	mov	dh, dl			; DH = wiersz
+	mov	dl, cl			; DL = kolumna
+	int	10h			; ustaw nasz kursor tam
+
+	mov	dx, lewy_p
+	mov	ah, 9
+	int	21h
+
+	jmp	short petla
+
+pokaz_p:
+				; wiemy, ze CX=kolumna, DX=wiersz, gdzie
+				;naciśnięto klawisz, ale to są numery pikseli
+				; Aby otrzymać kolumnę i wiersz, dzielimy je
+				; przez 8 (bo jest 8 pikseli/znak):
+	shr	dx, 3
+	shr	cx, 3
+
+	mov	ah, 2			; funkcja ustawiania kursora
+	mov	dh, dl			; DH = wiersz
+	mov	dl, cl			; DL = kolumna
+	int	10h			; ustaw nasz kursor tam
+
+	mov	dx, prawy_p
+	mov	ah, 9
+	int	21h
+
+	jmp	short petla
+
+
+koniec:
+	mov	ax, 4c00h
+	int	21h
+
+nie_ma_myszy	db	&quot;Sterowniki myszy nie sa zainstalowane.$&quot;
+lewy_p		db	&quot;Lewy$&quot;
+prawy_p		db	&quot;Prawy$&quot;</PRE>
+
+<P><a name="mysz_tut02" id="mysz_tut02">Jak widać, korzystanie z myszy</a> niekoniecznie musi być tak trudne,
+ jak to się mogło wydawać.
+Po bardziej zaawansowane funkcje radzę sięgnąć do RBIL, gdzie zawsze znajdziecie więcej
+informacji o danym przerwaniu niż w moim kursie, który skupia się przecież na przedstawianiu
+algorytmów a nie na zapamiętywaniu każdego szczególiku.
+
+</P>
+<P>
+Miłego eksperymentowania.</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

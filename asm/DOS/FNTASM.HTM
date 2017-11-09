@@ -1,0 +1,165 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Porównanie dyrektyw różnych kompilatorów </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<link rel="alternate" type="text/html" href="../linux/fnasm.html"
+	hreflang="pl" lang="pl" title="Wersja dla Linuksa">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Porównanie dyrektyw FASMa, NASMa, TASMa, MASMa i Watcom Asemblera">
+<META NAME="Keywords" CONTENT="FASM, NASM, TASM, assembler, asembler, asm, Watcom Assembler, MASM,
+	różnice, kompilacja, Microsoft Assembler, Turbo Assembler, Netwide Assembler, Flat Assembler">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite/Kate; www.kate-editor.org">
+
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Porównanie dyrektyw i sposobów kompilacji różnych kompilatorów</h1>
+<br><br>
+<a href="#fntasm01" tabindex="1" class="bezdruk">(przeskocz różnice składni)</a>
+
+<TABLE summary="Ta tabela przedstawia najczęściej używane dyrektywy
+	w języku asembler oraz ich składnię w kompilatorach TASM, NASM, FASM, MASM i Watcom">
+<caption>Najważniejsze różnice między dyrektywami TASMa, FASMa, NASMa, MASMa i
+	<span lang="en">Watcom</span> Asemblera<br>
+	</caption>
+
+<TR class="c"><TH style="width:10%" id="typ">typ dyrektywy<br><br></TH>
+	<TH style="width:30%" id="nasm"><acronym title="Netwide Asembler" lang="en">NASM</acronym></TH>
+	<TH style="width:30%" id="fasm"><acronym title="Flat Asembler">FASM</acronym></TH>
+	<TH style="width:30%" id="tasm"><acronym title="Turbo Asembler">TASM</acronym> /
+	<acronym title="Microsoft Macro Assembler" lang="en">MASM</acronym> /
+	<acronym title="Watcom Assembler" lang="en">WA</acronym></TH> </TR>
+
+<TR class="c"> <TD headers="typ"> deklaracje danych<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> db, dw, dd, dq, dt<br></TD>
+        <TD headers="fasm"> <span class="niewidTD">FASM: </span> db, dw/du, dd, dp/df, dq, dt<br> </TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> db, dw, dd, dp/df, dq, dt<hr> </TD> </TR>
+
+<TR class="c"> <TD headers="typ"> rezerwacja niezainicjalizowanej pamięci<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> resb, resw, resd, resq, rest<br></TD>
+	<TD headers="fasm"> <span class="niewidTD">FASM: </span> rb, rw, rd, rp/rf, rq, rt<br> </TD>
+	<TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> db/dw/dd/dp/dq/dt liczba DUP(?)<hr> </TD> </TR>
+
+<TR class="c"> <TD headers="typ"> deklaracje tablic<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span>
+		TIMES 10 db "$"<br>TIMES 25*34 db/dw/dd/dp/df/dq/dt 0<br>resb/resw/resd/resq/rest 25*34</TD>
+        <TD headers="fasm"> <span class="niewidTD">FASM: </span>
+		TIMES 10 db "$"<br>TIMES 25*34 db/dw/dd/dp/df/dq/dt 0<br>rb/rw/rd/rp/rf/rq/rt 25*34</TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span>
+		db 10 dup("$")<br>db/dw/dd/dp/df/dq/dt 25 dup (34 dup(0))<br>db/dw/dd/dp/df/dq/dt 25 dup (34 dup(?))<hr> </TD> </TR>
+
+<TR class="c"> <TD headers="typ"> operacje liczbowe i bitowe<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> +, -, *, /, %, |, ^, &amp;, &lt;&lt;, &gt;&gt;, ~<br></TD>
+        <TD headers="fasm"> <span class="niewidTD">FASM: </span> +, -, *, /, mod, or, xor, and, shl, shr, not<br> </TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> +, -, *, /, mod, or, xor, and, shl, shr, not<hr> </TD> </TR>
+
+<TR class="c"> <TD headers="typ"> deklaracje stałych<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> %<span lang="en">define</span>, %<span lang="en">idefine</span>,
+        	 %<span lang="en">xdefine</span>, %<span lang="en">xidefine</span>,
+        	 <span lang="en">equ</span><br> </TD>
+	<TD headers="fasm"> <span class="niewidTD">FASM: </span> =, equ<br> </TD>
+	<TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> =, equ<hr> </TD> </TR>
+
+<TR class="c"> <TD headers="typ"> etykiety anonimowe<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> tylko w trybie zgodności z TASMem <br></TD>
+	<TD headers="fasm"> <span class="niewidTD">FASM: </span> @@, @b/@r, @f<br> </TD>
+	<TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> @@, @b, @f <hr></TD> </TR>
+
+<TR class="c"> <TD headers="typ"> makra<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> %<span lang="en">macro</span>, %<span lang="en">imacro</span> nazwa liczba_arg ... %endm<br> </TD>
+	<TD headers="fasm"> <span class="niewidTD">FASM: </span> <span lang="en">macro</span> nazwa arg {...}<br> </TD>
+	<TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> nazwa <span lang="en">macro</span> arg ... endm<hr> </TD> </TR>
+
+<TR class="c"> <TD headers="typ"> kompilacja warunkowa<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> %if, %if(n)def, %elif, %<span lang="en">else</span>, %endif<br> </TD>
+        <TD headers="fasm"> <span class="niewidTD">FASM: </span> if, <span lang="en">else if</span>, <span lang="en">else</span>, end if<br> </TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> if***, <span lang="en">elseif</span>, <span lang="en">else</span>, endif<hr> </TD> </TR>
+
+<TR class="c"> <TD headers="typ"> struktury<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> struc nazwa ... endstruc<br> </TD>
+	<TD headers="fasm"> <span class="niewidTD">FASM: </span> struc nazwa {...} <br></TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> nazwa struc ... ends<hr></TD> </TR>
+
+<TR class="c"> <TD headers="typ"> symbole zewnętrzne<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> extern, global <br></TD>
+	<TD headers="fasm"> <span class="niewidTD">FASM: </span> extrn, <span lang="en">public</span><br> </TD>
+	<TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> extrn, <span lang="en">public</span><hr> </TD> </TR>
+
+<TR class="c"> <TD headers="typ"> segmenty<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> segment nazwa<br> </TD>
+        <TD headers="fasm"> <span class="niewidTD">FASM: </span> segment nazwa  ; (format MZ)<br> </TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> nazwa segment<hr></TD> </TR>
+
+<TR class="c"> <TD headers="typ"> dostępność instrukcji<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> wszystkie domyślnie dostępne<br> dyrektywa CPU </TD>
+        <TD headers="fasm"> <span class="niewidTD">FASM: </span> wszystkie zawsze dostępne<br> </TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA: </span> .8086, .186, .286, .386, .486, .586, .686, .mmx, .xmm<hr></TD> </TR>
+
+<TR class="l"> <TD class="c" headers="typ"> typowy początek programu .com <br></TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> org 100h<hr></TD>
+        <TD headers="fasm"> <span class="niewidTD">FASM: <br></span> format binary<BR>org 100h <hr></TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA:<br> </span> .model <span lang="en">tiny</span><BR>.<span lang="en">code</span><BR>
+        	<BR>org 100h<BR>start:<hr></TD> </TR>
+
+<TR class="l"> <TD class="c" headers="typ"> typowy początek programu .exe<br> </TD>
+        <TD headers="nasm"> <span class="niewidTD">NASM: </span> ..start:<hr></TD>
+        <TD headers="fasm"> <span class="niewidTD">FASM:<Br> </span> format MZ<BR>stack 400h<BR><span lang="en">entry</span> kod:start
+        	<BR>segment kod<BR>start:<hr> </TD>
+        <TD headers="tasm"> <span class="niewidTD">TASM/MASM/WA:<br> </span> .model <span lang="en">small</span><BR>.<span lang="en">stack</span> 400h
+        	<BR>.<span lang="en">code</span><BR>start:<hr></TD> </TR>
+
+</TABLE>
+
+<br><br>
+
+<TABLE summary="Ta tabela przedstawia sposoby kompilacji w kompilatorach TASM, NASM, FASM, MASM i Watcom">
+<caption><a name="fntasm01" id="fntasm01">Sposoby kompilacji</a> w TASM, FASM, NASM, MASM i
+	<span lang="en">Watcom</span> Asemblerze</caption>
+
+<TR class="c"><TH style="width:10%" id="typp">typ programu</TH>
+	<TH style="width:24%" id="nasmp"><acronym title="Netwide Asembler" lang="en">NASM</acronym></TH>
+	<TH style="width:16%" id="fasmp"><acronym title="Flat Asembler">FASM</acronym></TH>
+	<TH style="width:10%" id="tasmp"><acronym title="Turbo Asembler">TASM</acronym></th>
+	<TH style="width:10%" id="masmp"><acronym title="Microsoft Macro Assembler" lang="en">MASM</acronym> (16-bitowy)</th>
+	<TH style="width:30%" id="wap"  ><acronym title="Watcom Assembler" lang="en">WA</acronym></TH> </TR>
+
+<TR class="c"> <TD headers="typp"> .com<br> </TD>
+        <TD headers="nasmp"> nasm -f bin -o prog.com prog.asm<hr></TD>
+        <TD headers="fasmp"> fasm prog.asm prog.com<hr></TD>
+        <TD headers="tasmp"> tasm prog.asm<br>tlink /t prog.obj<hr></TD>
+        <td headers="masmp"> ml prog.asm<hr></td>
+        <td headers="wap"  > wasm -fpi87 prog.asm<br>
+				wlink system dos com f prog.obj name prog.com<hr></td>
+        </TR>
+
+<TR class="c"> <TD headers="typp"> .exe<br> </TD>
+        <TD headers="nasmp"> nasm -f obj -o prog.obj prog.asm<Br>val prog.obj,prog.exe,,,<hr></TD>
+        <TD headers="fasmp"> fasm prog.asm prog.exe<hr></TD>
+        <TD headers="tasmp"> tasm prog.asm<br>tlink prog.obj <hr></TD>
+        <td headers="masmp"> ml prog.asm <hr></td>
+        <td headers="wap"  > wasm -fpi87 prog.asm<br>
+				wlink system dos f prog.obj name prog.exe<hr></td>
+        </TR>
+
+</table>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

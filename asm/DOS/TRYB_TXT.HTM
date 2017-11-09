@@ -1,0 +1,416 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Dostęp do pamięci ekranu </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Dostęp do pamięci ekranu">
+<META NAME="Keywords" CONTENT="Ekran, pamięć, B800, asm, assembler, asembler">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Bezpośredni dostęp do ekranu</h1>
+
+<P>
+Jeśli myślicie, że odpowiednie funkcje przerwań 10h i 21h są jedynym sposobem na to, aby napisać
+coś na ekranie, to ten kurs pokaże Wam, jak bardzo się mylicie.
+</P>
+<P>
+Na ekran w trybie tekstowym składa się 80x25 = 2000 znaków. Nie oznacza to jednak 2000 bajtów,
+gdyż każdy znak <q>zaopatrzony</q> jest w pewną wartość (1 bajt) mówiącą o jego wyglądzie.
+ Łącznie jest więc 2000 słów (<span lang="en">word</span>, 16 bitów = 2 bajty),
+ czyli 4000 bajtów. Mało, w porównaniu z wielkością
+1 segmentu (64<abbr title="kilobajt">kB</abbr>).
+ Te 4000 bajtów <q>żyje</q> sobie w pewnym segmencie pamięci - 0B800h
+(kolorowe karty graficzne) lub 0B000h (mono).
+</P>
+<P>
+Struktura tego bloku nie jest skomplikowana i wygląda następująco:</P>
+<P>
+b800:0000 - znak 1, w lewym górnym rogu<BR>
+b800:0001 - atrybut znaku 1<BR>
+b800:0002 - znak 2, znajdujący się o 1 pozycję w prawo od znaku 1<BR>
+b800:0003 - atrybut znaku 2<BR>
+i tak dalej</P>
+
+<P>Czym zaś jest atrybut?<BR>
+Jest to bajt mówiący o kolorze danego znaku i kolorze tła dla tego znaku. Bity w tym bajcie
+oznaczają:<BR>
+3-0 - kolor znaku (16 możliwości)<BR>
+6-4 - kolor tła (8 możliwości)<BR>
+7 - miganie znaku (jeśli nie działa, to oznacza, że mamy 16 kolorów tła zamiast 8)<BR>
+</P>
+<P>
+Jeszcze tylko wystarczy omówić kolory odpowiadające poszczególnym bitom i możemy coś pisać.
+<BR>Oto te kolory:<br>
+Czarny - 0, niebieski - 1, zielony - 2, błękitny - 3, czerwony - 4, różowy - 5,
+brązowy - 6, jasnoszary (ten standardowy) - 7, ciemnoszary - 8, jasnoniebieski - 9,
+jasnozielony - 10, jasnobłękitny - 11, jasnoczerwony - 12, jasnoróżowy - 13,
+żółty - 14, biały - 15.</P>
+
+<P>To powinno mówić samo za siebie:
+ chcemy biały znak na czarnym tle? Odpowiedni bajt = 0fh.<BR>
+A może żółty znak na niebieskim tle? Bajt = 1eh.
+</P>
+<P>
+Poniżej zamieszczam także programik, który szybko napisałem w celu przetestowania teorii tu
+przedstawionej (składnia NASM):</P>
+
+	<BR><a href="#tryb_txt02" tabindex="1" class="bezdruk">(przeskocz przykładowy program)</a>
+<PRE title="przykładowy program">
+	; nasm -O999 -o test.com -f bin test.asm
+
+	org 100h
+
+		mov ax, 0b800h
+		mov bx, cs
+		mov es, ax		; es = 0b800 = segment pamięci ekranu
+		mov ds, bx		; ds = cs
+		xor di, di		; pozycja docelowa = di = 0
+		mov si, tekst		; skąd brać bajty
+		mov cx, dlugosc		; ile bajtów brać
+
+		rep movsb		; przesuń CX bajtów z DS:SI do ES:DI
+
+		xor ah, ah
+		int 16h
+
+		mov ax, 4c00h
+		int 21h
+
+	tekst	db &quot;T&quot;,1,&quot;e&quot;,2,&quot;k&quot;,3,&quot;s&quot;,4,&quot;t&quot;,5
+		db &quot; &quot;,6,&quot;w&quot;,7,&quot;i&quot;,8,&quot;e&quot;,9,&quot;l&quot;,10,&quot;o&quot;,11,&quot;k&quot;,12,&quot;o&quot;,13
+		db &quot;l&quot;,14,&quot;o&quot;,15,&quot;r&quot;,16,&quot;o&quot;,27h,&quot;w&quot;,38h,&quot;y&quot;,49h
+
+	dlugosc equ $-tekst</PRE>
+
+<P><a name="tryb_txt02" id="tryb_txt02">Zastosowałem w nim stałą</a>
+ typu <CODE>equ</CODE>, aby nie zmieniać CX po każdorazowej nawet
+najdrobniejszej zmianie tekstu.</P>
+<P>
+
+Jak widać, wpisywanie każdorazowo znaku z jego argumentem niekoniecznie sprawia przyjemność.
+Na szczęście z pomocą przychodzi nam BIOS, ale nie funkcja 0e przerwania 10h, lecz funkcja 13h
+tegoż przerwania (opis wycięty z
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html"
+ hreflang="en" lang="en"> Ralf Brown's Intterrupt List</A>):</P>
+
+	<BR><a href="#tryb_txt03" class="bezdruk">(przeskocz opis int 10h, ah=13h)</a>
+<PRE title="int 10h, ah=13h" lang="en">
+	INT 10 - VIDEO - WRITE STRING (AT and later,EGA)
+	        AH = 13h
+	        AL = write mode
+	           bit 0: update cursor after writing
+	           bit 1: string contains alternating characters
+	           	 and attributes
+	           bits 2-7: reserved (0)
+	        BH = page number
+	        BL = attribute if string contains only characters
+	        CX = number of characters in string
+	        DH,DL = row,column at which to start writing
+	        ES:BP -> string to write</PRE>
+
+<P><a name="tryb_txt03" id="tryb_txt03">I krótki przykładzik zastosowania</a> (fragment kodu dla TASMa):</P>
+	<BR><a href="#tryb_txt04" class="bezdruk">(przeskocz przykład zastosowania int 10h, ah=13h)</a>
+
+<PRE title="przykład zastosowania int 10h, ah=13h">
+	mov cx,cs
+	mov ax,1301h			; funkcja pisania ciągu znaków
+	mov es,cx			; es = cs
+	mov bx,j_czer			; atrybut (kolor)
+	mov cx,info1_dl			; długość ciągu
+	mov bp,offset info1		; adres ciągu
+	mov dx,(11 shl 8) or (40 - (info1_dl shr 1))	;wiersz+kolumna
+	int 10h				; piszemy napis
+
+	info1		db	&quot;Informacja&quot;
+	info1_dl	equ	$ - info1</PRE>
+
+<P><a name="tryb_txt04" id="tryb_txt04">Najwięcej wątpliwości może wzbudzać</a>
+ linia kodu, która zapisuje wartość do DX (wiersz i kolumnę
+ekranu). Do DH idzie oczywiście 11 (bo do DX idzie b=11 shl 8, czyli 0b00h). Napis
+<CODE>(info1_dl shr 1)</CODE> dzieli długość tekstu na 2, po czym tę wartość odejmujemy od 40. Po co?<BR>
+Jak wiemy, ekran ma 80 znaków szerokości. A tutaj od 40 odejmujemy połowę długości tekstu, który
+chcemy wyświetlić. Uzyskamy więc w taki sposób efekt wyśrodkowania tekstu na ekranie. I to
+wszystko.</P>
+
+<P>
+No dobrze, a co jeśli nie chcemy używać przerwań a i tak chcemy mieć tekst w wyznaczonej przez
+nas pozycji?<BR>
+Trzeba wyliczyć <q>odległość</q> naszego miejsca od lewego górnego rogu ekranu. Jak nietrudno zgadnąć,
+wyraża się ona wzorem (gdy znamy współrzędne przed kompilacją):<BR>
+wiersz*80 + kolumna<BR>
+i to tę wartość umieszczamy w DI i wykonujemy rep movsb.<BR>
+Gdy zaś współrzędne mogą się zmieniać lub zależą od użytkownika, to użyjemy następującej
+sztuczki (kolumna i wiersz to 2 zmienne po 16 bitów):</P>
+
+	<BR><a href="#tryb_txt05" class="bezdruk">(przeskocz obliczanie adresu w pamięci ze współrzędnych)</a>
+
+<PRE title="obliczanie przesunięcia z danych współrzędnych">
+	mov ax, [wiersz]
+	mov bx, ax		; BX = AX
+	shl ax, 6		; AX = AX*64
+	shl bx, 4		; BX = BX*16 = AX*16
+	add ax, bx		; AX = AX*64 + AX*16 = AX*80
+	add ax, [kolumna]	; AX = 80*wiersz + kolumna
+
+	mov di, ax
+	shl di, 1	; DI mnożymy przez 2, bo są 2 bajty na pozycję</PRE>
+
+<P><a name="tryb_txt05" id="tryb_txt05">i też uzyskamy prawidłowy wynik</a>.
+ Odradzam stosowanie instrukcji (I)MUL, gdyż jest dość powolna.
+</P>
+<P>
+Zajmiemy się teraz czymś jeszcze ciekawszym: rysowanie ramek na ekranie. Oto programik, który
+na ekranie narysuje 2 wypełnione prostokąty (jeden będzie wypełniony kolorem czarnym). Korzysta
+on z procedury, która napisałem specjalnie w tym celu. Oto ten programik:</P>
+
+	<BR><a href="#tryb_txt06" class="bezdruk">(przeskocz program rysujący okienka z ramką)</a>
+
+<PRE title="program rysujący okienka z ramką">
+; Rysowanie okienek z ramką
+;
+; Autor: Bogdan D.
+;
+; nasm -O999 -o ramki.com -f bin ramki.asm
+
+
+org 100h
+
+; ramki podwójne:
+
+	mov	ah, 7
+	xor	bx, bx
+	xor	cx, cx
+	mov	dx, 9
+	mov	bp, 9
+	call	rysuj_okienko
+
+	mov	ah, 42h
+	mov	bx, 10
+	mov	cx, 10
+	mov	dx, 20
+	mov	bp, 16
+	call	rysuj_okienko
+
+	xor	ah, ah
+	int	16h
+
+	mov	ax, 4c00h
+	int	21h
+
+rysuj_okienko:
+
+; wejście:
+;
+;  AH = atrybut znaku (kolor)
+;  BX = kolumna lewego górnego rogu
+;  CX = wiersz lewego górnego rogu
+;  DX = kolumna prawego dolnego rogu
+;  BP = wiersz prawego dolnego rogu
+;
+; wyjście:
+;  nic
+
+
+r_p	equ	0bah		; prawa boczna
+r_pg	equ	0bbh		; prawa górna (narożnik)
+r_pd	equ	0bch		; prawa dolna
+
+r_g	equ	0cdh		; górna
+r_d	equ	r_g		; dolna
+
+r_l	equ	r_p		; lewa boczna
+r_lg	equ	0c9h		; lewa górna
+r_ld	equ	0c8h		; lewa dolna
+
+spacja	equ	20h
+
+
+	push	di
+	push	si
+	push	es
+	push	ax
+
+	mov	di, cx
+	mov	si, cx
+	shl	di, 6
+	shl	si, 4
+	add	di, si		; DI = DI*80 = numer pierwszego wiersza * 80
+
+
+	mov	si, 0b800h
+	mov	es, si		; ES = segment ekranu
+
+	mov	si, di
+	add	di, bx		; DI = pozycja początku
+	add	si, dx		; SI = pozycja końca
+
+	shl	di, 1		; 2 bajty/element
+	shl	si, 1
+
+	mov	al, r_lg
+	mov	[es:di], ax	; rysujemy lewy górny narożnik
+
+	add	di, 2
+
+	mov	al, r_g		; będziemy rysować górny brzeg
+
+.rysuj_gore:
+
+	cmp	di, si		; dopóki DI &lt; pozycja końcowa
+	jae	.koniec_gora
+
+	mov	[es:di], ax
+	add	di, 2
+	jmp	short .rysuj_gore
+
+.koniec_gora:
+	mov	al, r_pg
+	mov	[es:di], ax	; rysujemy prawy górny narożnik
+
+
+.wnetrze:
+	shr	di, 1
+
+	add	di, 80		; kolejny wiersz
+	sub	di, dx		; początek wiersza
+
+	push	di
+
+	mov	di, bp
+	mov	si, bp
+	shl	di, 6
+	shl	si, 4
+	add	si, di		; SI = SI*80 = numer ostatniego wiersza * 80
+
+	pop	di
+
+	cmp	di, si		; czy skończyliśmy?
+	je	.koniec_wnetrze
+
+	mov	si, di
+	add	di, bx		; DI = pozycja początku
+	add	si, dx		; SI = pozycja końca
+
+	shl	di, 1		; 2 bajty / element
+	shl	si, 1
+
+	mov	al, r_l
+	mov	[es:di], ax	; rysujemy lewy brzeg
+	add	di, 2
+
+	mov	al, spacja	; wnętrze okienka wypełniamy spacjami
+.rysuj_srodek:
+
+	cmp	di, si		; dopóki DI &lt; pozycja końcowa
+	jae	.koniec_srodek
+
+	mov	[es:di], ax
+	add	di, 2
+	jmp	short .rysuj_srodek
+
+.koniec_srodek:
+
+	mov	al, r_p
+	mov	[es:di], ax	; rysujemy prawy brzeg
+
+	jmp	short .wnetrze
+
+.koniec_wnetrze:
+
+
+	mov	di, bp
+	mov	si, bp
+	shl	di, 6
+	shl	si, 4
+	add	di, si		; DI = DI*80
+
+
+	mov	si, di
+	add	di, bx		; DI = pozycja początku w ostatnim wierszu
+	add	si, dx		; SI = pozycja końca w ostatnim wierszu
+
+	shl	di, 1		; 2 bajty / element
+	shl	si, 1
+
+	mov	al, r_ld
+	mov	[es:di], ax	; rysujemy lewy dolny narożnik
+
+	add	di, 2
+
+	mov	al, r_d		; będziemy rysować dolny brzeg
+
+.rysuj_dol:
+
+	cmp	di, si		; dopóki DI &lt; pozycja końcowa
+	jae	.koniec_dol
+
+	mov	[es:di], ax
+	add	di, 2
+	jmp	short .rysuj_dol
+
+.koniec_dol:
+	mov	al, r_pd
+	mov	[es:di], ax	; rysujemy prawy dolny narożnik
+
+
+	pop	ax
+	pop	es
+	pop	si
+	pop	di
+
+	ret</PRE>
+
+<P><a name="tryb_txt06" id="tryb_txt06">Program nie jest skomplikowany</a>,
+ a komentarze powinny rozwiać wszystkie wątpliwości. Nie będę
+więc szczegółowo omawiał, co każda linijka robi, skupię się jednak na kilku sprawach:</P>
+<UL>
+ <LI>Oddzielanie instrukcji od jej argumentów tabulatorem<BR>
+	<P>Poprawia to nieco czytelność kodu.</P></LI>
+
+ <LI>Kropki przed etykietami<BR>
+	<P>Sprawiają, że te etykiety są lokalne dla tej procedury. Nie będą się mylić z takimi
+	samymi etykietami umieszczonymi po innej etykiecie globalnej.</P></LI>
+
+ <LI>Stosowanie <CODE>equ</CODE><BR>
+	<P>Wygodniejsze niż wpisywanie ciągle tych samych bajtów w kilkunastu miejscach. Szybko
+	umożliwiają przełączenie się na przykład na ramki pojedynczej długości.</P></LI>
+
+ <LI><P>Nie używam MUL, gdyż jest za wolne (co prawda tutaj nie zrobiłoby to może ogromnej różnicy,
+	ale gdzie indziej mogłoby).</P></LI>
+
+ <LI>Umieszczenie w programie sposobu kompilacji<BR>
+	<P>Może oszczędzić innym dużego bólu głowy, którego by się nabawili, szukając kompilatora
+	dla tego kodu.</P></LI>
+
+ <LI>Napisanie, co procedura przyjmuje i co zwraca<BR>
+	<P>Bardzo ważne! Dzięki temu użytkownik wie, co ma wpisać do jakich rejestrów, co procedura
+	zwraca i (ewentualnie) które rejestry modyfikuje (tego raczej należy unikać).
+	</P></LI>
+</UL>
+<P>
+Jak widać, <q>ręczne</q> manipulowanie ekranem wcale nie musi być trudne, a jest wprost idealnym
+rozwiązaniem, jeśli zależy nam na szybkości i nie chcemy używać powolnych przerwań.</P>
+
+<P>Miłego eksperymentowania!</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

@@ -1,0 +1,244 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Manipulacja diodami klawiatury </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Manipulacja diodami klawiatury">
+<META NAME="Keywords" CONTENT="klawiatura, diody, LED, asm, assembler, asembler">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Zabawa diodami na klawiaturze</h1>
+
+
+<P>Aby uczynić swój program bardziej atrakcyjnym wzrokowo i pochwalić się swoimi umiejętnościami,
+można sprawić, aby diody na klawiaturze wskazujące stan
+ <span lang="en">Num Lock, Caps Lock, Scroll Lock</span> zaczęły migotać w jakimś rytmie.<BR>
+Teraz pokażę, jak to zrobić.</P>
+<P>
+Najpierw, tradycyjnie, spojrzymy w spis portów dołączony do
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+>Listy Przerwań Ralfa <span lang="en">Brown</span>'a</A>.
+Potrzebny nam będzie podstawowy port kontrolera klawiatury, port 60h:</P>
+	<BR><a href="#diod_tut01" tabindex="1" class="bezdruk">(przeskocz port 60h)</a>
+<PRE title="port 60h" lang="en">
+	0060 RW KB controller data port or keyboard input buffer (ISA, EISA)
+                should only be read from after status port bit0 = 1
+                should only be written to if status port bit1 = 0</PRE>
+
+
+<P><a name="diod_tut01" id="diod_tut01">Jak widać, trzeba też znaleźć jakiś port statusu</a>.
+Jest to port 64h:</P>
+	<BR><a href="#diod_tut02" class="bezdruk">(przeskocz port 64h)</a>
+<PRE title="port 64h" lang="en">
+	Bitfields for keyboard controller read status (ISA, EISA):
+	Bit(s)  Description     (Table P0398)
+  	 7      parity error on transmission from keyboard
+ 	 6      receive timeout
+	 5      transmit timeout
+	 4      keyboard interface inhibited by keyboard lock
+	        or by password server mode
+	 3      =1 data written to input register is command (PORT 0064h)
+	        =0 data written to input register is data (PORT 0060h)
+	 2      system flag status: 0=power up or reset  1=selftest OK
+	 1      input buffer full (input 60/64 has data for 8042)
+	        no write access allowed until bit clears
+	 0      output buffer full (output 60 has data for system)
+	        bit is cleared after read access</PRE>
+
+<P><a name="diod_tut02" id="diod_tut02">Tak więc, potrzebna nam będzie procedura sprawdzająca</a>,
+ czy można pisać do portu klawiatury.
+Spróbujmy ją napisać:</P>
+	<BR><a href="#diod_tut03" class="bezdruk">(przeskocz procedurę sprawdzającą zajętość portu)</a>
+<PRE title="procedura sprawdzania zajętości portu">
+	; wersja TASM
+	czy_mozna_pisac		proc	near
+		push eax
+	sprawdzaj:
+		in al,64h
+		and al,2		; sprawdzamy bit nr. 1
+		jnz sprawdzaj		; jeśli różny od zera, to
+					; sprawdzaj do skutku
+
+		pop eax
+		ret
+	czy_mozna_pisac		endp</PRE>
+
+<P><a name="diod_tut03" id="diod_tut03">Teraz wersja NASM/FASM</a>:</P>
+	<BR><a href="#diod_tut04" class="bezdruk">(przeskocz wersję NASM/FASM tej procedury)</a>
+<PRE title="wersja NASM/FASM procedury sprawdzania zajętości portu">
+	; wersja NASM
+	czy_mozna_pisac:
+		push eax
+	sprawdzaj:
+		in al,64h
+		and al,2		; sprawdzamy bit nr. 1
+		jnz sprawdzaj		; jeśli różny od zera, to
+					;sprawdzaj do skutku
+
+		pop eax
+		ret</PRE>
+
+<P><BR><a name="diod_tut04" id="diod_tut04">Ta powinna wystarczyć</a>.<BR>
+Trzeba jeszcze znaleźć polecenie kontrolera klawiatury, które kontroluje stan diód. Jest to
+bajt EDh:</P>
+	<BR><a href="#diod_tut05" class="bezdruk">(przeskocz komendę ustawiania diód)</a>
+<PRE title="opis komendy EDh" lang="en">
+	EDh    	       set/reset mode indicators Caps Num Scrl
+        	       bit 2 = CapsLk, bit 1 = NumLk, bit 0 = ScrlLk
+               		all other bits must be zero.</PRE>
+
+<P><a name="diod_tut05" id="diod_tut05">Możemy już zacząć coś pisać</a>:</P>
+	<BR><a href="#diod_tut06" class="bezdruk">(przeskocz pierwszy program)</a>
+<PRE title="pierwsze testy diód">
+	call czy_mozna_pisac
+	MOV AL,0EDh
+	OUT 60h,AL
+	XOR AL,AL		;żadna dioda się nie pali
+	OUT 60h,AL
+	call czy_mozna_pisac
+	MOV AL,0EDh
+	OUT 60h,AL
+	MOV AL,2		;Num Lock
+	OUT 60h,AL
+	call czy_mozna_pisac
+	MOV AL,0EDh
+	OUT 60h,AL
+	MOV AL,1		;Scroll Lock
+	OUT 60h,AL
+	call czy_mozna_pisac
+	MOV AL,0EDh
+	OUT 60h,AL
+	MOV AL,6		;Caps+Num
+	OUT 60h,AL</PRE>
+
+<P><a name="diod_tut06" id="diod_tut06">To był tylko przykład</a>.
+ No więc uruchamiamy go i co? Bzyk! I już nasz program się zakończył.
+Może komuś udało się zaobserwować efekty (z wyjątkiem ostatniego, który jest trwały). To
+stawia 2 pytania:</P>
+<OL>
+ <LI>Jak sprawić, żeby trwało to dłużej?</LI>
+ <LI>Jak powrócić do stanu pierwotnego, zgodnego z prawdą?</LI>
+</OL>
+<P>
+Odpowiedzią na pierwsze pytanie jest już użyta raz przeze mnie w innym artykule funkcja 86h
+przerwania 15h. Przypomnę: CX:DX = liczba mikrosekund przerwy, którą chcemy uzyskać.<BR>
+Po dodaniu niezbędnych linijek program może wyglądać tak:</P>
+	<BR><a href="#diod_tut07" class="bezdruk">(przeskocz program z opóźnieniami)</a>
+<PRE title="program z opóźnieniami">
+	MOV AH,86h
+	MOV CX,0Fh
+	MOV DX,4240h
+
+	call czy_mozna_pisac
+	MOV AL,0EDh
+	OUT 60h,AL
+	XOR AL,AL		;żadna dioda się nie pali
+	OUT 60h,AL
+	INT 15h
+	;MOV AH,86h
+	;INT 15h
+	call czy_mozna_pisac
+	MOV AL,0EDh
+	OUT 60h,AL
+	MOV AL,2		;Num Lock
+	OUT 60h,AL
+	MOV AH,86h
+	INT 15h
+	;MOV AH,86h
+	;INT 15h</PRE>
+
+<P><a name="diod_tut07" id="diod_tut07">i tak dalej...</a><BR>
+Jeśli zauważycie, że to nic nie daje, to odkomentujcie drugie wywołania przerwania. Rejestr AH
+musi być przed każdym wywołaniem przywracany, gdyż przerwanie go modyfikuje.
+</P>
+<P>
+A co z drugim pytaniem?<BR>
+Z pomocą tym razem przychodzi spis przerwań. Patrzymy:</P>
+	<BR><a href="#diod_tut08" class="bezdruk">(przeskocz opis funkcji 2 przerwania 16h)</a>
+<PRE lang="en" title="int 16h, ah=2">
+	INT 16 - KEYBOARD - GET SHIFT FLAGS
+	        AH = 02h
+	Return: AL = shift flags (see #00582)
+	        AH destroyed by many BIOSes
+
+	Bitfields for keyboard shift flags:
+	Bit(s)  Description     (Table 00582)
+	 7      Insert active
+	 6      CapsLock active
+	 5      NumLock active
+	 4      ScrollLock active
+	 3      Alt key pressed
+	 2      Ctrl key pressed
+	 1      left shift key pressed
+	 0      right shift key pressed</PRE>
+
+<P><a name="diod_tut08" id="diod_tut08">Nasz programik</a> będzie więc wyglądał mniej-więcej tak:</P>
+	<BR><a href="#diod_tut09" class="bezdruk">(przeskocz program z opóźnieniami i z przywracaniem stanu)</a>
+<PRE title="program z opóźnieniami i przywracaniem stanu pierwotnego">
+		MOV AH,2
+		INT 16h
+		MOV BH,AL		; zachowujemy stary stan klawiatury
+
+		MOV AH,86h
+		MOV CX,0Fh
+		MOV DX,4240h
+
+
+		call czy_mozna_pisac
+		MOV AL,0EDh
+		OUT 60h,AL
+		XOR AL,AL		;żadna dioda się nie pali
+		OUT 60h,AL
+		INT 15h
+		;MOV AH,86h
+		;INT 15h
+		...
+		...
+
+		XOR AL,AL
+		TEST BH,01000000b	; czy Caps był włączony?
+		JZ nie_caps
+		OR AL,4			; tak, ustaw bit 2
+	nie_caps:
+		TEST BH,00100000b	; czy Num?
+		JZ nie_num
+		OR AL,2
+	nie_num:
+		TEST BH,00010000b	; czy Scroll?
+		JZ koniec
+		OR AL,1
+	koniec:
+		MOV BL,AL
+		MOV AL,0EDh
+		OUT 60h,AL
+		MOV AL,BL
+		OUT 60h,AL
+		...</PRE>
+
+<P><a name="diod_tut09" id="diod_tut09">Dalsze eksperymenty pozostawiam czytelnikom.</a>
+ Pamiętajcie, że istnieje aż 8 różnych kombinacji
+stanów diód i można przecież robić różne odstępy czasowe między zmianą stanu.</P>
+<P>
+Miłej zabawy.</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

@@ -1,0 +1,305 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Wyświetlanie obrazków BMP </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Wyświetlanie obrazków BMP w asemblerze">
+<META NAME="Keywords" CONTENT="BMP, assembler, asm, asembler, bitmapa">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Wyświetlanie obrazków BMP</h1>
+
+<P>
+Jeśli przejrzeliście mój poprzedni kurs związany z grafiką, to umiecie już coś samodzielnie
+narysować.</P>
+<P>
+Ale przecież w Internecie (i nie tylko) jest tyle ciekawych rysunków, nie mówiąc już o tych,
+które moglibyście stworzyć dla jakiegoś specjalnego celu, na przykład swojej własnej gry. Dlatego
+teraz pokażę, jak takie rysunki wyświetlać. Ze względu na prostotę formatu, wybrałem pliki
+typu BMP. Plik, który chcecie wyświetlić powinien mieć rozmiar 320x200 pikseli w 256
+kolorach (jak pamiętamy, taki rysunek pasuje jak ulał do trybu graficznego 13h).<BR>
+Wszystkie operacje na pliku zostały już przez mnie szczegółowo opisane w jednej z części
+mojego kursu, więc tutaj nie będziemy poświęcać im zbyt wiele uwagi.<BR>
+Ale przejdźmy wreszcie do interesujących nas szczegółów.
+</P>
+<P>
+Powinniście zaopatrzyć się w cokolwiek, co opisuje format BMP. Informacje, z których
+będę tutaj korzystał, znalazłem w Internecie (niestety, nie pamiętam już gdzie, ale możecie
+poszukać na <A HREF="http://www.wotsit.org/" hreflang="en">Wotsit.org</A>).<BR>
+A oto nagłówek pliku BMP (składnia języka Pascal niestety, info: <q>Piotr Sokolowski, 6 maja 1998r</q>):</P>
+	<BR><a href="#bmp_tut01" tabindex="1" class="bezdruk">(przeskocz opis nagłówka)</a>
+<PRE title="nagłówek BMP" lang="en">
+	Type
+ 	 TBitMapHeader =
+  	  Record
+		bfType :             Word; (dwa bajty)
+   		bfSize :             LongInt; (cztery bajty)
+   		bfReserved :         LongInt;
+   		bfOffBits :          LongInt;
+   		biSize :             LongInt;
+   		biWidth :            LongInt;
+   		biHeight :           LongInt;
+   		biPlanes :           Word;
+   		biBitCount :         Word;
+   		biCompression :      LongInt;
+   		biSizeImage :        LongInt;
+   		biXPelsPerMeter :    LongInt;
+   		biYPelsPerMeter :    LongInt;
+   		biClrUsed :          LongInt;
+   		biClrImportant :     LongInt;
+  	  End;
+</pre>
+<P>Gdzie:</P>
+<ul>
+ <li><span lang="en">bftype</span> - jest to dwubajtowa sygnatura <q>BM</q></li>
+ <li><span lang="en">bfsize</span> - czterobajtowy rozmiar pliku</li>
+ <li><span lang="en">bfreserved</span> - pole zarezerwowane (0)</li>
+ <li><span lang="en">bfoffbits</span> - przesunięcie (adres) początku danych graficznych</li>
+ <li><span lang="en">bisize</span> - podaje rozmiar nagłówka</li>
+ <li><span lang="en">biwidth</span> - wysokość bitmapy w pikselach</li>
+ <li><span lang="en">biheight</span> - szerokość bitmapy w pikselach</li>
+ <li><span lang="en">biplanes</span> - liczba planów (prawie zawsze ma wartość 1)</li>
+ <li><span lang="en">bibitcound</span> - liczba bitów na piksel. Przyjmuje wartość 1,4,8 lub 24.</li>
+ <li><span lang="en">bicompression</span> - sposób kompresji</li>
+ <li><span lang="en">bisizeimag</span> - rozmiar obrazka w bajtach. W przypadku bitmapy nieskompresowanej równe 0.</li>
+ <li><span lang="en">biXpelspermeter, biYpelspermeter</span> - liczba pikseli na metr</li>
+ <li><span lang="en">biclrused</span> - liczba kolorów istniejącej palety, a używanych właśnie przez bitmapę</li>
+ <li><span lang="en">biclrimporant</span> - określa, który kolor bitmapy jest najważniejszy, gdy równy
+ 	 0 to wszystkie	są tak samo istotne.</li>
+</ul>
+
+<P><a name="bmp_tut01" id="bmp_tut01">Ale spokojnie - nie musicie znać tych wszystkich pól</a>,
+ bo my nie będziemy wszystkich używać.
+Ściśle mówiąc, nie będziemy używać ani jednego z tych pól!<BR>
+No to po co to wszystko?<BR>
+Po to, aby znać długość nagłówka pliku (54 bajty), który ominiemy przy analizie pliku.
+</P>
+<P>
+Po nagłówku idzie paleta 256 kolorów * 4 bajty/kolor = kolejny 1kB. Jeśli macie jakieś
+wątpliwości co do
+tego 1 kilobajta, to słusznie. Oczywiście, do opisu koloru wystarczą 3 bajty (odpowiadające
+kolorom czerwonemu, zielonemu i niebieskiemu - RGB), co daje razem 768 bajtów. Co czwarty bajt
+nie zawiera żadnej istotnej informacji i będziemy go pomijać (zmienna <q>z</q>).
+</P>
+<P>
+Zaraz po palecie idzie obraz, piksel po pikselu. Niestety, nie jest to tak logiczne
+ustawienie, jak byśmy sobie tego życzyli. Otóż, pierwsze 320 bajtów to ostatni wiersz obrazka,
+drugie 320 - przedostatni, itd. Dlatego trzeba będzie troszkę pokombinować.
+</P>
+<P>
+Zanim jeszcze zaczniemy, należy się przyjrzeć, których portów (choć to samo można uzyskać
+wywołując odpowiednie przerwanie) i dlaczego będziemy używać (patrzymy do pliku <q>ports.lst</q> w
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+	>Spisie Przerwań Ralfa <span lang="en">Brown</span>'a</A>):</P>
+	<BR><a href="#bmp_tut02" class="bezdruk">(przeskocz opis portów)</a>
+<PRE lang="en" title="opis portów 3C8 i 3C9">
+	03C8  RW  (VGA,MCGA) PEL address register (write mode)
+                 Sets DAC in write mode and assign start of color register
+                 index (0..255) for following write accesses to 3C9h.
+                 Don't read from 3C9h while in write mode. Next access to
+                 03C8h will stop pending mode immediatly.
+	03C9  RW  (VGA,MCGA) PEL data register
+                 Three consequtive reads (in read mode) or writes (in write
+                 mode) in the order: red, green, blue. The internal DAC index
+                 is incremented each 3rd access.
+                  bit7-6: HiColor VGA DACs only: color-value bit7-6
+                  bit5-0:                        color-value bit5-0</PRE>
+
+<P><a name="bmp_tut02" id="bmp_tut02">Czyli najpierw na port 3C8h idzie numer rejestru</a>
+ dla danego koloru (rejestrów jest 256 i kolorów
+też), a potem na 3C9h idą trzy wartości kolorów: czerwonego, zielonego i niebieskiego,
+których połączenie daje nam żądany kolor.</P>
+<P>
+Ale dobierzmy się wreszcie do kodu:</P>
+
+	<BR><a href="#bmp_tut03" class="bezdruk">(przeskocz program)</a>
+<PRE title="program wyświetlający bitmapę">
+; Program wyświetla na ekranie kolorowy rysunek o rozmiarze
+; 320x200 w 256 kolorach, umieszczony w pliku.
+;
+; nasm -O999 -o bmp1.com -f bin bmp1.asm
+;
+; Autor: Bogdan D., bogdandr (at) op (kropka) pl
+;
+; na podstawie kodu podpisanego &quot;Piotr Sokolowski&quot;,
+; napisanego w języku Pascal
+
+org 100h
+
+start:
+	mov	ax, 13h
+	int	10h	; uruchamiamy tryb graficzny 13h - 320x200x256
+
+	mov	ax, 3d00h		; otwieramy plik tylko do odczytu
+	mov	dx, nazwa_pliku
+	int	21h
+
+	jnc	otw_ok
+
+	mov	ah, 9
+	mov	dx, blad_plik		; wyświetlane, gdy wystąpił błąd
+	int	21h
+
+err:
+	mov	ax, 4c01h		; wyjście z kodem błędu=1
+	int	21h
+
+otw_ok:
+	mov	bx, ax			; bx = uchwyt do pliku
+	mov	ah, 3fh			; czytanie z pliku
+	mov	cx, 54			; wyrzucamy 54 bajty nagłówka
+	mov	dx, smieci
+	int	21h
+	jc	err
+
+; wczytywanie palety z pliku:
+
+
+	xor	si, si			; indeks do tablicy &quot;paleta&quot;
+
+czytaj_pal:
+	mov	ah, 3fh			; czytanie z pliku
+	mov	cx, 4			; czytam po 4 bajty - do b,g,r i z.
+					; (&quot;z&quot; nas nie interesuje)
+	mov	dx, b
+	int	21h
+	jc	err
+
+					; ustawiamy paletę:
+	mov	al, [r]
+	shr	al, 2
+	mov	[paleta+si], al		; paleta[si] = [r] / 4
+
+	mov	al, [g]
+	shr	al, 2
+	mov	[paleta+si+1], al	; paleta[si] = [g] / 4
+
+	mov	al, [b]
+	shr	al, 2
+	mov	[paleta+si+2], al	; paleta[si] = [b] / 4
+
+	add	si, 3			; przejdź o 3 miejsca dalej -
+					; na kolejne wartości RGB
+
+	cmp	si, 256*3		; sprawdź, czy nie zapisaliśmy
+					; już wszystkich kolorów
+	jb	czytaj_pal
+
+; wysyłanie palety do karty graficznej:
+
+	xor	ax, ax
+	xor	si, si			; SI = indeks do palety
+
+	mov	dx, 3c8h		; port karty graficznej
+wyslij_palete:
+	out	dx, al			; wysyłamy numer rejestru,
+					; wszystkie od 0 do 255
+
+	inc	dx			; DX = port 3C9h
+
+	push	ax
+					; zapisujemy kolorki:
+					; czerwony, zielony, niebieski.
+
+	mov	al, [paleta+si]		; AL = czerwony
+					; (patrz: pętla <q>czytaj_pal</q>)
+	out	dx, al
+
+	mov	al, [paleta+si+1]	; AL = zielony
+	out	dx, al
+
+	mov	al, [paleta+si+2]	; AL = niebieski
+	out	dx, al
+
+	pop	ax
+
+	add	si, 3			; przejdź do następnych kolorów
+
+	dec	dx			; DX z powrotem 3C8h
+
+	inc	ax			; wybierzemy kolejny rejestr koloru
+					; w karcie graficznej
+
+	cmp	ax, 256			; sprawdź, czy już koniec pracy
+	jb	wyslij_palete
+
+; wczytywanie obrazka:
+
+	mov	ax, 0a000h
+	mov	ds, ax		; czytaj bezpośrednio do pamięci ekranu
+
+	mov	dx, 64000-320		; DX = adres ostatniego wiersza
+
+	mov	cx, 320			; z pliku czytamy po 320 bajtów
+
+obrazek:
+	mov	ah, 3fh
+	int	21h			; czytaj 320 bajtów prosto na ekran
+	jc	err
+
+	sub	dx, 320			; przejdź do wcześniejszego wiersza
+	jnc	obrazek			; dopóki nie musimy pożyczać
+					; do odejmowania. Pożyczymy dopiero
+					; wtedy, gdy DX &lt; 320 - a to się
+					; zdarzy dopiero, gdy DX = 0, czyli
+					; przerobiliśmy cały obrazek i ekran.
+					; Wtedy kończymy pracę.
+
+
+; koniec programu:
+
+	mov	ah, 3eh
+	int	21h			; zamknij plik
+	jc	err
+
+	xor	ah, ah
+	int	16h			; czekamy na klawisz
+
+	mov	ax, 3
+	int	10h			; powrót do trybu tekstowego
+
+	mov	ax, 4c00h
+	int	21h
+
+; dane:
+
+
+nazwa_pliku	db	&quot;rys1.bmp&quot;,0
+blad_plik	db	&quot;Blad operacji na pliku!$&quot;
+
+smieci:		times	54	db 0
+paleta:		times	768	db 0
+b		db 0
+g		db 0
+r		db 0
+z		db 0
+kolor		db 0
+</PRE>
+
+<P><a name="bmp_tut03" id="bmp_tut03">Mam nadzieję, że kod jest dość jasny.</a>
+ Nawet jeśli znacie asemblera tylko w takim stopniu, w
+jakim to jest możliwe po przeczytaniu mojego kursu, zrozumienie tego programu nie powinno
+sprawić Wam więcej kłopotów niż mnie sprawiło przetłumaczenie go z Pascala.</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+
+</BODY></HTML>

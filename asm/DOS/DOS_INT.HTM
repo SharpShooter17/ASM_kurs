@@ -1,0 +1,760 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Najczęściej stosowane funkcje przerwań </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Opis przerwań">
+<META NAME="Keywords" CONTENT="int, assembler, asm, asembler, przerwanie, DOS, BIOS">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Opis najczęściej używanych funkcji podstawowych przerwań</h1>
+
+<P>
+Najlepszy opis wszystkich funkcji wszystkich przerwań można znaleźć w
+ <span lang="en">Ralf Brown's Interrupt List</span>
+(<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html"
+ hreflang="en"><acronym title="Ralf Brown's Interrupt List" lang="en">RBIL</acronym></A>).
+
+Po ściągnięciu RBIL należy rozpakować wszystkie archiwa i uruchomić
+</p>
+<pre>
+		COMBINE .</pre>
+<p>aby zbudować listę przerwań, oraz</p>
+<pre>
+		COMBINE -p .</pre>
+<p>
+aby zbudować listę portów. Lista przerwań znajduje się w pliku <code>INTERRUP.LST</code>,
+a można ją przeglądać programem <code>INTERHLP.EXE</code> lub dowolnym edytorem.
+Lista portów znajduje się w pliku <code>PORTS.LST</code>,
+a można ją przeglądać programem <code>II.EXE</code> lub dowolnym edytorem.
+</P>
+<P>
+<em class="wazne">UWAGA:</em> Niektóre debugery mogą wpływać na wartości widziane w rejestrach. Może
+się tak stać na przykład wtedy, gdy przerwanie, które wywołujemy, jest wewnętrznie wykorzystywane przez debuger.
+W szczególności, może to mieć miejsce w przypadku <span class="b">Turbo Debuggera</span>
+i funkcji <code>3Fh</code> i <code>40h</code> przerwania
+<acronym lang="en" title="Disk Operating System">DOS</acronym>-a (<code>int 21h</code>).
+</P>
+<P>
+Spis treści tej strony:</P>
+<ul>
+ <li><A HREF="#int10h" tabindex="1">int 10h</A> (funkcje 0, 2, 3, E, F i 13h)</li>
+ <li><A HREF="#int13h">int 13h</A> (funkcje 2 i 3)</li>
+ <li><A HREF="#int15h">int 15h</A> (funkcja 86h)</li>
+ <li><A HREF="#int16h">int 16h</A> (funkcje 0, 1, 2 i 4)</li>
+ <li><A HREF="#int21h">int 21h</A> (funkcje 1, 2, 9, 2a+2b, 2c+2d, 3c, 3d, 3e,
+	3f, 40h, 41h, 42h, 4b i 4c)</li>
+</ul>
+
+<!-- ================================================================= -->
+
+
+<HR>
+
+<h2 class="nag"><A NAME="int10h" id="int10h">int 10h (przerwanie karty graficznej)</a></h2>
+
+<UL>
+ <LI>funkcja 0 - ustaw tryb graficzny:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 0</LI>
+	 <LI>AL = żądany tryb graficzny (patrz niżej)</LI>
+	</UL>
+	<P>Podstawowe tryby graficzne i ich <q>rozdzielczości</q>:</P>
+	<UL>
+	 <LI>0 - tekstowy, 40x25, segment 0B800</LI>
+	 <LI>1 - tekstowy, 40x25, segment 0B800</LI>
+	 <LI>2 - tekstowy, 80x25, segment 0B800</LI>
+	 <LI>3 - tekstowy (tradycyjny), 80x25, segment 0B800</LI>
+	 <LI>12h - graficzny, 640x480 w 16/256tys. kolorach, segment 0A000</LI>
+	 <LI>13h - graficzny, 320x200 w 256 kolorach, segment 0A000</LI>
+	</UL>
+	<BR></LI>
+
+ <LI>funkcja 2 - ustaw pozycję kursora tekstowego:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 2</LI>
+	 <LI>BH = numer strony, zazwyczaj 0</LI>
+	 <LI>DH = wiersz (0 oznacza górny)</LI>
+	 <LI>DL = kolumna (0 oznacza lewą)</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 3 - pobierz pozycję kursora tekstowego i jego rozmiar:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 3</LI>
+	 <LI>BH = numer strony, zazwyczaj 0</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>CH = początkowa linia skanowania (górna granica kursora)</LI>
+	 <LI>CL = końcowa linia skanowania (dolna granica kursora)</LI>
+	 <LI>DH = wiersz (0 oznacza górny)</LI>
+	 <LI>DL = kolumna (0 oznacza lewą)</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 0Eh - wypisz znak na ekran:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 0Eh</LI>
+	 <LI>AL = kod
+	 <acronym title="American Standard Code for Information Interchange" lang="en">ASCII</acronym>
+	 znaku do wypisania</LI>
+	 <LI>BH = numer strony, zazwyczaj 0</LI>
+	 <LI>BL = kolor (tylko w trybach graficznych)</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 0Fh - pobierz tryb graficzny:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 0Fh</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>AH = liczba kolumn znakowych</LI>
+	 <LI>AL = bieżący tryb graficzny</LI>
+	 <LI>BH = aktywna strona</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 13h - wyświetl napis:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 13h</LI>
+	 <LI>AL = tryb:
+	  <UL>
+	   <li>bit 0 ustawiony = przesuwaj kursor po zapisie</li>
+	   <li>bit 1 ustawiony = dane zawierają naprzemienne znaki i atrybuty
+		(bit nieustawiony oznacza, że dane zawierają tylko znaki)</li>
+	   <li>bit 2-7 są zarezerwowane i muszą być równe 0</li>
+	  </UL></LI>
+	 <LI>BH = numer strony graficznej</LI>
+	 <LI>BL = atrybut znaków, gdy dane zawierają tylko znaki</LI>
+	 <LI>CX = długość danych</LI>
+	 <LI>DH = numer wiersza na ekranie, gdzie wyświetlić napis</LI>
+	 <LI>DL = numer kolumny na ekranie, gdzie wyświetlić napis</LI>
+	 <LI>ES:BP = adres danych</LI>
+	</UL>
+	<BR><BR></LI>
+
+</UL>
+
+
+<!-- ================================================================= -->
+
+<HR>
+
+<h2 class="nag"><A NAME="int13h" id="int13h">int 13h (obsługa dysków)</a></h2>
+
+<UL>
+ <LI>funkcja 2 - czytaj sektory dysku do pamięci:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 2</LI>
+	 <LI>AL = liczba sektorów do odczytania (musi być niezerowa)</LI>
+	 <LI>CH = najmłodsze 8 bitów numeru cylindra</LI>
+	 <LI>CL = <BR>
+		bity 0-5: numer sektora (1-63)<BR>
+		bity 6-7: najstarsze 2 bity numeru cylindra (tylko dla twardych dysków)</LI>
+	 <LI>DH = numer głowicy</LI>
+	 <LI>DL = numer dysku, dla dysków twardych bit7=1 (0=dysk A:, 1=B:, 80h=C:, 81h=D:, ...)</LI>
+	 <LI>ES:BX = adres miejsca, gdzie będą zapisane dane odczytane z dysku</LI>
+	</UL>
+
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>flaga CF=1, jeśli wystąpił błąd; CF=0, gdy nie było błędu</LI>
+	 <LI>AH=status (patrz niżej)</LI>
+	 <LI>AL=liczba przeczytanych sektorów (nie zawsze prawidłowy)</LI>
+	</UL>
+
+	<P><a name="int13_status">Podstawowe wartości statusu:</a></P>
+	<UL>
+	 <LI>0 - operacja zakończyła się bez błędów</LI>
+	 <LI>3 - dysk jest chroniony przed zapisem</LI>
+	 <LI>4 - sektor nie znaleziony / błąd odczytu</LI>
+	 <LI>6 - zmiana dyskietki. Najczęściej spowodowany tym, że napęd nie zdążył się
+		rozpędzić. Ponowić próbę.</LI>
+	 <LI>80h - przekroczony limit czasu operacji. Dysk nie jest gotowy.</LI>
+	</UL>
+
+	<P>
+	Przykład (czytanie <span lang="en">boot</span>sektora):</P>
+	<PRE title="czytanie pierwszego sektora">
+		mov	ax, 0201h	; funkcja czytania sektorów
+		xor	dx, dx		; głowica 0, dysk 0 = A:
+		mov	cx, 1		; numer sektora
+		mov	bx, bufor	; dokąd czytać
+		int	13h		; czytaj
+		jnc	czyt_ok		; sprawdź, czy błąd	</PRE>
+	<BR></LI>
+
+ <LI>funkcja 3 - zapisz dane z pamięci na sektorach dysku:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 3</LI>
+	 <LI>AL = liczba sektorów do zapisania (musi być niezerowa)</LI>
+	 <LI>CH = najmłodsze 8 bitów numeru cylindra</LI>
+	 <LI>CL = <BR>
+		bity 0-5: numer sektora (1-63)<BR>
+		bity 6-7: najstarsze 2 bity numeru cylindra (tylko dla twardych dysków)</LI>
+	 <LI>DH = numer głowicy</LI>
+	 <LI>DL = numer dysku, dla dysków twardych bit7=1 (0=dysk A:, 1=B:, 80h=C:, 81h=D:, ...)</LI>
+	 <LI>ES:BX = adres miejsca, skąd będą pobierane dane do zapisania na dysk</LI>
+	</UL>
+
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>flaga CF=1, jeśli wystąpił błąd; CF=0, gdy nie było błędu</LI>
+	 <LI>AH=status (<a href="#int13_status" hreflang="pl">patrz wyżej</a>)</LI>
+	 <LI>AL=liczba zapisanych sektorów (nie zawsze prawidłowy)</LI>
+	</UL>
+
+	<P>
+	Przykład (zapisywanie <span lang="en">boot</span>sektora):</P>
+	<PRE title="zapisanie pierwszego sektora">
+		mov	ax, 0301h	; funkcja zapisu sektorów
+		xor	dx, dx		; głowica 0, dysk 0 = A:
+		mov	cx, 1		; numer sektora
+		mov	bx, bufor	; skąd brać dane do zapisu
+		int	13h		; zapisz
+		jnc	blad		; sprawdź, czy błąd	</PRE>
+	</LI>
+</UL>
+
+
+
+<!-- ================================================================= -->
+
+
+
+<BR>
+<HR>
+
+<h2 class="nag"><A NAME="int15h" id="int15h">int 15h (część
+	 <acronym lang="en" title="Basic Input/Output System">BIOS</acronym>-u)</a></h2>
+
+<UL>
+ <LI>funkcja 86h - czekaj określoną liczbę milisekund:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 86h</LI>
+	 <LI>CX:DX = czas w milisekundach</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>flaga CF=0, gdy nie wystąpił błąd; CF=1 po błędzie</LI>
+	 <LI>AH = status:<BR>
+		80h	nieprawidłowa komenda (PC,PCjr)<BR>
+		83h	funkcja już trwa<BR>
+		86h	funkcja nie jest obsługiwana (XT)
+		</LI>
+	</UL>
+	</LI>
+</UL>
+
+
+
+
+
+<!-- ================================================================= -->
+
+
+
+<BR>
+<HR>
+
+<h2 class="nag"><A NAME="int16h" id="int16h">int 16h (obsługa klawiatury)</a></h2>
+
+<UL>
+ <LI>funkcja 0 - pobierz kod naciśniętego klawisza (lub czekaj na naciśnięcie):<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 0</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>AH = BIOSowy kod klawisza (<a href="skankod.htm" hreflang="pl">skankod</a>)</LI>
+	 <LI>AL = kod klawisza ASCII</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 1 - sprawdź, czy naciśnięto klawisz:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 1</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy nie naciśnięto klawisza:
+	  <ul>
+	   <li>flaga ZF=1</li>
+	  </ul><br></LI>
+	 <LI>gdy naciśnięto klawisz:
+	  <ul>
+	   <li>flaga ZF=0</li>
+	   <li>AH = BIOSowy kod klawisza (<a href="skankod.htm" hreflang="pl">skankod</a>)</li>
+	   <li>AL = kod klawisza ASCII</li>
+	  </ul></LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 2 - pobierz stan klawiszów przełączających:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 2</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>AL = flagi:<BR>
+		bit7 = klawisz Insert jest aktywny<BR>
+		bit6 = <span lang="en">Caps Lock</span> aktywny<BR>
+		bit5 = <span lang="en">Num Lock</span> aktywny<BR>
+		bit4 = <span lang="en">Scroll Lock</span> aktywny<BR>
+		bit3 = naciśnięty klawisz ALT<BR>
+		bit2 = naciśnięty klawisz CTRL<BR>
+		bit1 = naciśnięty lewy klawisz <span lang="en">SHIFT</span><BR>
+		bit0 = naciśnięty prawy klawisz <span lang="en">SHIFT</span><BR>
+	 </LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 4 (Tandy 2000, ale chyba nie tylko) - opróżnij bufor klawiatury:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 4</LI>
+	</UL>
+	</LI>
+
+</UL>
+
+
+
+
+
+<!-- ================================================================= -->
+
+
+
+<BR>
+<HR>
+
+<h2 class="nag"><A NAME="int21h" id="int21h">int 21h
+ (<acronym lang="en" title="Disk Operating System">DOS</acronym>)</a></h2>
+
+<UL>
+ <LI>funkcja 1 - czytaj klawisz:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 1</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>AL = kod klawisza ASCII</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 2 - wyświetl znak:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 2</LI>
+	 <LI>DL = kod ASCII znaku do wypisania</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 9 - wyświetl napis:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 9</LI>
+	 <LI>DS:DX = adres łańcucha znaków zakończonego znakiem dolara <q>$</q></LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 2A - pobierz datę systemową:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 2Ah</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>CX = rok (1980-2099)</LI>
+	 <LI>DH = miesiąc</LI>
+	 <LI>DL = dzień</LI>
+	 <LI>podobno AL = dzień tygodnia (0=niedziela)</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 2B - ustaw datę systemową:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 2Ah</LI>
+	 <LI>CX = rok (1980-2099)</LI>
+	 <LI>DH = miesiąc (1-12)</LI>
+	 <LI>DL = dzień (1-31)</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>AL = status (0=sukces, FF=błąd)</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 2C - pobierz czas systemowy:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 2Ch</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>CH = godzina</LI>
+	 <LI>CL = minuta</LI>
+	 <LI>DH = sekunda</LI>
+	 <LI>DL = setne sekundy (nie zawsze)</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 2D - ustaw czas systemowy:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 2Dh</LI>
+	 <LI>CH = godzina</LI>
+	 <LI>CL = minuta</LI>
+	 <LI>DH = sekunda</LI>
+	 <LI>DL = setne sekundy</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>AL = status (0=sukces, FF=błąd)</LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 3C - utwórz plik (jeśli istnieje, skróć do zerowej długości):<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 3Ch</LI>
+	 <LI>CX = atrybuty (patrz niżej)</LI>
+	 <LI>DS:DX = wskaźnik na nazwę pliku, zakończoną bajtem zerowym</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy brak błędu:
+	  <ul>
+	   <li>flaga CF=0</li>
+	   <li>AX = uchwyt do pliku</li>
+	  </ul><br></LI>
+	 <LI>gdy błąd:
+	  <ul>
+	   <li>flaga CF=1</li>
+	   <li>AX = numer błędu: 3, 4 lub 5 (patrz niżej)</li>
+	  </ul></LI>
+	</UL>
+
+	<BR>
+	<P>Atrybuty pliku:</P>
+	<UL>
+	 <LI>bit0 = plik tylko do odczytu</LI>
+	 <LI>bit1 = ukryty</LI>
+	 <LI>bit2 = systemowy</LI>
+	 <LI>bit3 = etykieta dysku (ignorowane)</LI>
+	 <LI>bit4 = zarezerwowany, musi być równy 0 (katalog)</LI>
+	 <LI>bit5 = bit archiwalny</LI>
+	 <LI>bit7 = udostępnialność w <span lang="en">Novell NetWare</span></LI>
+	</UL>
+
+	<BR>
+	<P><a name="dos_err_code">Najczęstsze zwracane kody:</a></P>
+	<UL>
+	 <LI>0 = brak błędu</LI>
+	 <LI>1 = nieprawidłowy numer funkcji</LI>
+	 <LI>2 / 3 = plik / ścieżka nie znaleziona</LI>
+	 <LI>4 = za dużo otwartych plików</LI>
+	 <LI>5 = brak dostępu</LI>
+	 <LI>6 = niewłaściwy uchwyt do pliku</LI>
+	 <LI>8 = za mało pamięci</LI>
+	 <LI>A = nieprawidłowe środowisko</LI>
+	 <LI>B = nieprawidłowy format</LI>
+	 <LI>C = nieprawidłowy kod dostępu</LI>
+	 <LI>56h = nieprawidłowe hasło</LI>
+	</UL>
+
+	<P>
+	Przykład:</P>
+	<PRE title="przykład otwierania pliku">
+	mov	ah, 3ch			; utwórz plik
+	xor	cx, cx			; żadnych atrybutów
+	mov	dx, plik		; DS:DX = adres nazwy pliku
+	int	21h
+	jnc	plik_ok			; sprawdź, czy wystąpił błąd</PRE>
+
+	<BR></LI>
+
+ <LI>funkcja 3D - otwórz istniejący plik:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 3Dh</LI>
+	 <LI>AL = tryb dostępu (patrz niżej)</LI>
+	 <LI>DS:DX = adres nazwy pliku zakończonej bajtem zerowym</LI>
+	 <LI>CL = maska atrybutów pliku do wyszukiwania (tylko serwery)</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy brak błędu:
+	  <ul>
+	   <li>flaga CF=0</li>
+	   <li>AX = uchwyt do pliku</li>
+	  </ul><br></LI>
+	 <LI>gdy błąd:
+	  <ul>
+	   <li>flaga CF=1</li>
+	   <li>AX = numer błędu: 1, 2, 3, 4, 5, C, 56h (<a href="#dos_err_code" hreflang="pl">patrz wyżej</a>)</li>
+	  </ul></LI>
+	</UL>
+
+
+	<P>
+	Tryb dostępu do pliku:</P>
+	<UL>
+	 <LI>bit0-2 = tryb dostępu:<BR>
+		000 = tylko do odczytu<BR>
+		001 = tylko do zapisu<BR>
+		010 = odczyt/zapis<BR></LI>
+	 <LI>bit3 = 0</LI>
+	 <LI>bit4-6 = tryb współdzielenia:<BR>
+		000 = tryb kompatybilności<BR>
+		001 = zabroń innym odczytu i zapisu<BR>
+		010 = zabroń innym zapisu<BR>
+		011 = zabroń innym odczytu<BR>
+		100 = nie zabraniaj nikomu niczego</LI>
+	 <LI>bit7 = prywatność. Plik nie będzie dziedziczony przez procesy potomne</LI>
+	</UL>
+
+	<P>
+	Przykład:</P>
+	<PRE title="przykład tworzenia pliku">
+	mov	ax, 3d02h		; otwórz plik R/W, tryb zgodności
+	mov	dx, plik		; DS:DX = adres nazwy pliku
+	int	21h
+	jnc	otw_ok			</PRE>
+
+	<BR></LI>
+
+
+ <LI>funkcja 3E - zamknij plik:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 3Eh</LI>
+	 <LI>BX = uchwyt do pliku</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy brak błędu:
+	  <ul>
+	   <li>flaga CF=0</li>
+	  </ul><br></LI>
+	 <LI>gdy błąd:
+	  <ul>
+	   <li>flaga CF=1</li>
+	   <li>AX = numer błędu: 6 (<a href="#dos_err_code" hreflang="pl">patrz wyżej</a>)</li>
+	  </ul></LI>
+	</UL>
+	<BR><BR></LI>
+
+
+ <LI>funkcja 3F - czytaj z pliku:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 3Fh</LI>
+	 <LI>BX = uchwyt do pliku</LI>
+	 <LI>CX = liczba bajtów do odczytania</LI>
+	 <LI>DS:DX = adres bufora, który ma przyjąć dane</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy brak błędu:
+	  <ul>
+	   <li>flaga CF=0</li>
+	   <li>AX = liczba przeczytanych bajtów</li>
+	  </ul><br></LI>
+	 <LI>gdy błąd:
+	  <ul>
+	   <li>flaga CF=1</li>
+	   <li>AX = numer błędu: 5, 6 (<a href="#dos_err_code" hreflang="pl">patrz wyżej</a>)</li>
+	  </ul></LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 40h - zapisz do pliku:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 40h</LI>
+	 <LI>BX = uchwyt do pliku</LI>
+	 <LI>CX = liczba bajtów do zapisania</LI>
+	 <LI>DS:DX = adres bufora zawierającego dane do zapisania</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy brak błędu:
+	  <ul>
+	   <li>flaga CF=0</li>
+	   <li>AX = liczba zapisanych bajtów</li>
+	  </ul><br></LI>
+	 <LI>gdy błąd:
+	  <ul>
+	   <li>flaga CF=1</li>
+	   <li>AX = numer błędu: 5, 6 (<a href="#dos_err_code" hreflang="pl">patrz wyżej</a>)</li>
+	  </ul></LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 41h - skasuj plik:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 41h</LI>
+	 <LI>DS:DX = adres nazwy pliku, zakończonej bajtem zerowym</LI>
+	 <LI>maska atrybutów (tylko serwery)</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy brak błędu:
+	  <ul>
+	   <li>flaga CF=0</li>
+	  </ul><br></LI>
+	 <LI>gdy błąd:
+	  <ul>
+	   <li>flaga CF=1</li>
+	   <li>AX = numer błędu: 2, 3, 5 (<a href="#dos_err_code" hreflang="pl">patrz wyżej</a>)</li>
+	  </ul></LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 42h - ustaw bieżącą pozycję w pliku:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 42h</LI>
+	 <LI>AL = skąd odliczamy pozycję:<BR>
+		0 = początek pliku<BR>
+		1 = bieżąca pozycja w pliku<BR>
+		2 = koniec pliku</LI>
+	 <LI>BX = uchwyt do pliku</LI>
+	 <LI>CX:DX = liczba bajtów, o które chcemy się przesunąć (może być ujemna)</LI>
+	</UL>
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy brak błędu:
+	  <ul>
+	   <li>flaga CF=0</li>
+	   <li>DX:AX = nowa pozycja, w bajtach od początku pliku</li>
+	  </ul><br></LI>
+	 <LI>gdy błąd:
+	  <ul>
+	   <li>flaga CF=1</li>
+	   <li>AX = numer błędu: 1, 6 (<a href="#dos_err_code" hreflang="pl">patrz wyżej</a>)</li>
+	  </ul></LI>
+	</UL>
+	<BR><BR></LI>
+
+ <LI>funkcja 4B - załaduj i/lub uruchom inny program:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 4Bh</LI>
+	 <LI>AL = rodzaj działania:<BR>
+		0 = załaduj i uruchom<BR>
+		1 = załaduj, ale nie uruchamiaj<BR>
+		3 = załaduj, nakładając na aktualny program<BR>
+		4 = załaduj i uruchom w tle (tylko European MS-DOS 4.0)</LI>
+	 <LI>DS:DX = adres nazwy programu, zakończonej bajtem zerowym. Nazwa musi
+		 uwzględniać rozszerzenie pliku.</LI>
+	 <LI>ES:BX = adres bloku parametrów (patrz niżej)</LI>
+	 <LI>CX = tryb (tylko dla AL=4):<BR>
+		0 = proces potomny po zakończeniu zostaje umieszczony w stanie zombie<BR>
+		1 = kod zakończenia procesu potomnego jest odrzucany</LI>
+	</UL>
+
+	<P>Zwraca:</P>
+	<UL>
+	 <LI>gdy brak błędu:
+	  <ul>
+	   <li>flaga CF=0</li>
+	  </ul><br></LI>
+	 <LI>gdy błąd:
+	  <ul>
+	   <li>flaga CF=1</li>
+	   <li>AX = numer błędu: 1, 2, 5, 8, A, B (<a href="#dos_err_code" hreflang="pl">patrz wyżej</a>)</li>
+	  </ul></LI>
+	</UL>
+
+	<P>
+	Blok parametrów (AL=0,1,4):</P>
+	<UL>
+	 <LI>WORD: segment zmiennych środowiska dla procesu potomnego (0 = użyć środowiska
+		rodzica)</LI>
+	 <LI>DWORD: wskaźnik na linię poleceń dla programu uruchamianego</LI>
+	 <LI>DWORD: wskaźnik na pierwszy FCB dla procesu potomnego (nieaktualne)</LI>
+	 <LI>DWORD: wskaźnik na drugi FCB dla procesu potomnego (nieaktualne)</LI>
+	 <LI>(dla AL=1) DWORD: po zakończeniu będzie zawierać początkowe SS:SP</LI>
+	 <LI>(dla AL=1) DWORD: po zakończeniu będzie zawierać początkowe CS:IP</LI>
+
+	</UL>
+
+	<P>
+	Przykład:</P>
+	<PRE title="przykład uruchamiania programu">
+	mov	[kom_ln+2], cs	;uzupełniamy pola potrzebnych struktur
+	mov	[fcb1+2], cs
+	mov	[fcb2+2], cs
+
+	mov	ax, 4b00h	; funkcja uruchomienia programu
+	mov	dx, program	; adres nazwy programu
+	mov	bx, srod	; środowisko i cała reszta
+	int	21h		; uruchamiamy
+	....
+
+	fcb 		db 3, &quot; &quot;, 0, 0, 0, 0, 0
+	linia_kom 	db 0
+	          	times 7fh db 0dh
+
+	srod		dw	0
+	kom_ln		dw	linia_kom, 0
+	fcb1		dw	fcb, 0
+	fcb2		dw	fcb, 0	</PRE>
+
+	<BR></LI>
+
+ <LI>funkcja 4Ch - zakończ działanie bieżącego programu:<BR>
+	<P>Argumenty:</P>
+	<UL>
+	 <LI>AH = 4Ch</LI>
+	 <LI>AL = kod wyjścia (<span lang="en">errorlevel</span>)
+	 	zwracany systemowi operacyjnemu (przyjmuje
+		się, że AL=0 oznacza zakończenie bez błędów)</LI>
+	</UL>
+	</LI>
+
+</UL>
+
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>
+

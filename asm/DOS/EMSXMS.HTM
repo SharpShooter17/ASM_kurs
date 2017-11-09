@@ -1,0 +1,619 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Pamięć EMS i XMS </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Porty szeregowe i równoległe">
+<META NAME="Keywords" CONTENT="asm, assembler, asembler, DOS, pamięć, EMS, XMS">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite/Kate; www.kate-editor.org">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Pamięć <acronym title="Expanded Memory Specification" lang="en">EMS</acronym> i
+<acronym title="Extended Memory Specification" lang="en">XMS</acronym></h1>
+
+<P>
+Jak wiemy, programy w trybie 16-bitowym są ograniczone do jednego megabajta pamięci,
+z której mogą korzystać. Dzieje się tak ze względu na to, że w trybie 16-bitowym
+adres fizyczny otrzymuje się, mnożąc zawartość rejestru segmentowego przez 16
+i dodając offset (adres w segmencie), co daje 16 * 65536 = 1<abbr title="megabajt">MB</abbr>.
+Więcej po prostu fizycznie procesor nie jest w stanie zaadresować. A jeśli nie można
+podać adresu wyższego niż 1MB, to nie można tam nic zapisać ani odczytać.
+O strukturze pamięci pisałem szerzej w <a href="a_kurs02.htm" hreflang="pl">części drugiej</a>
+mojego kursu.
+</P>
+<p>
+Jednak na procesorach od 80386 w górę można adresować wyższe obszary pamięci.
+Robi się to przy użyciu menadżerów pamięci EMS i XMS.
+Te specjalne programy wprowadzają procesor w tryb, który umożliwia adresowanie
+pamięci w obszarach powyżej 1MB, nadal będąc w środowisku 16-bitowym, takim jak DOS.
+</p>
+<p>
+Menadżery pamięci, po uruchomieniu, udostępniają interfejs w postaci przerwań, z których
+mogą korzystać programy 16-bitowe. Tym interfejsem się właśnie zajmiemy.
+</p>
+
+
+
+
+
+<hr>
+<h2 class="nag">EMS</h2>
+	<BR><a href="#xms" class="bezdruk" tabindex="1">(przeskocz EMS)</a>
+
+<P>
+Historycznie, <a href="http://pl.wikipedia.org/wiki/Expanded_Memory_Specification"
+hreflang="pl">pamięć EMS</a> była fizycznym urządzeniem, kartą wkładaną do gniazd rozszerzeń,
+jak karty ISA czy PCI.
+</P>
+<P>
+Wraz ze spadkiem kosztu pamięci <acronym lang="en" title="Random Access Memory">RAM</acronym>,
+pamięć EMS zaczęła być emulowana za pomocą
+standardowej pamięci RAM komputera i tak też pozostało - współczesne menadżery EMS (jak
+<a href="http://www.japheth.de/Jemm.html" hreflang="en">Jemm</a>
+czy EMM386) emulują dostęp do tych kart rozszerzeń z pamięcią i zamiast wysyłać żądania
+do urządzenia, po prostu wykorzystują pamięć RAM. Aby to działało, potrzebny jest jednak
+sterownik XMS, który w ogóle umożliwia dostęp do wyższych adresów.
+</P>
+<P>
+Skoro nie można bezpośrednio dostać się do pamięci powyżej 1MB, trzeba jakoś taki dostęp
+umożliwić poprzez dostępną pamięć. W EMS jest to zrealizowane za pomocą tak zwanej ramki stron.
+Jest to segment (czyli 64 kilobajty) pamięci w obszarze poniżej 1MB, który służy jako bufor
+do tymczasowego przechowywania danych kopiowanych do i z EMS.
+</P>
+<P>
+Najmniejszą jednostką, którą można buforować, jest tak zwana strona pamięci. Strona pamięci
+ma wielkość 16 kilobajtów, więc ramka stron mieści 4 strony fizyczne, do których mapowane
+(odwzorowywane) mogą być strony logiczne EMS, znajdujące się już powyżej granicy 1MB.
+</P>
+<P>
+Jak więc wykorzystać pamięć EMS w swoim programie? Algorytm jest następujący:
+</P>
+<ol>
+ <li>sprawdzić, czy sterownik EMS w ogóle jest załadowany</li>
+ <li>pobrać numer segmentu zawierającego ramkę stron</li>
+ <li>opcjonalnie sprawdzić, czy są jakieś wolne uchwyty pamięci (podobne do uchwytów plików)</li>
+ <li>zaalokować odpowiednią liczbę logicznych stron pamięci (w obszarze powyżej 1MB)</li>
+ <li>zmapować logiczne strony pamięci (w obszarze powyżej 1MB) na fizyczne strony
+	znajdujące się w ramce stron (w obszarze poniżej 1MB)</li>
+ <li>korzystać z pamięci</li>
+ <li>zwolnić pamięć EMS (jeśli tego nie zrobimy, pamięć będzie zaznaczona jako niedostępna
+	dla innych programów aż do restartu komputera)</li>
+</ol>
+<P>
+Teraz omówimy te punkty po kolei. Funkcje EMS są udostępniane przez przerwanie 67h, a zerowa wartość
+rejestru AH po powrocie z wywołania oznacza brak błędu.
+</P>
+<ol>
+ <li>Sprawdzić, czy sterownik EMS w ogóle jest załadowany.<br>
+	Robi się to w prosty sposób:
+	<ul>
+	 <li>pobieramy numer segmentu zawierającego procedurę obsługi przerwania 67h (przerwania EMS)</li>
+	 <li>sprawdzamy, czy po 10 bajtach od początku tego segmentu znajduje się ciąg znaków EMMXXXX0</li>
+	</ul>
+	<br><br></li>
+ <li>Pobrać numer segmentu zawierającego ramkę stron.<br>
+	Skoro już wiemy, że sterownik jest załadowany, można korzystać z przerwania 67h. Do pobrania
+	numeru segmentu zawierającego ramkę stron służy funkcja 41h:
+	<ul>
+	 <li>ustawiamy AH=41h</li>
+	 <li>wywołujemy przerwanie 67h</li>
+	 <li>po pomyślnym wywołaniu w rejestrze BX będzie numer segmentu zawierającego ramkę stron</li>
+	</ul>
+	<br><br></li>
+ <li>Opcjonalnie sprawdzić, czy są jakieś wolne uchwyty pamięci (podobne do uchwytów plików).<br>
+	Aby obliczyć liczbę wolnych uchwytów pamięci EMS, należy od łącznej liczby uchwytów
+	odjąć liczbę uchwytów zajętych. Robi się to dwoma wywołaniami:
+	<ul>
+	 <li>ustawiamy AX=5402h</li>
+	 <li>wywołujemy przerwanie 67h</li>
+	 <li>po pomyślnym wywołaniu w rejestrze BX będzie łączna liczba uchwytów</li>
+	 <li>ustawiamy AH=4Bh</li>
+	 <li>wywołujemy przerwanie 67h</li>
+	 <li>po pomyślnym wywołaniu w rejestrze BX będzie liczba używanych uchwytów</li>
+	</ul>
+	<br><br></li>
+ <li>Zaalokować odpowiednią liczbę logicznych stron pamięci (w obszarze powyżej 1MB).<br>
+	Tę czynność wykonuje się jednym wywołaniem:
+	<ul>
+	 <li>ustawiamy AH=43h</li>
+	 <li>ustawiamy BX na liczbę logicznych stron, które chcemy zająć (zaalokować)</li>
+	 <li>wywołujemy przerwanie 67h</li>
+	 <li>po pomyślnym wywołaniu w rejestrze DX będzie uchwyt do przydzielonego nam obszaru</li>
+	</ul>
+	<br><br></li>
+ <li>Zmapować logiczne strony pamięci (w obszarze powyżej 1MB) na fizyczne strony
+	znajdujące się w ramce stron (w obszarze poniżej 1MB).<br>
+	Tę czynność również wykonuje się jednym wywołaniem:
+	<ul>
+	 <li>ustawiamy AH=44h</li>
+	 <li>ustawiamy AL na numer fizycznej strony w ramce stron, do której chcemy przypisać
+		logiczną stronę. Jako że ramka stron mieści tylko 4 strony, AL powinien mieć
+		wartość od 0 do 3.</li>
+	 <li>ustawiamy BX na numer logicznej strony, którą wcześniej zaalokowaliśmy, a którą
+		chcemy zmapować do fizycznej strony. Strony numerujemy od zera, więc BX
+		powinien mieć wartość od 0 do liczby zaalokowanych logicznych stron minus jeden.</li>
+	 <li>wpisujemy do DX uchwyt do przydzielonego nam obszaru, z którego mają być brane
+		strony logiczne</li>
+	 <li>wywołujemy przerwanie 67h</li>
+	</ul>
+	<br><br></li>
+ <li>Korzystać z pamięci.<br>
+	Tu inwencja zależy tylko od twórcy programu. W większych obszarach pamięci można
+	przechowywać obrazy i dźwięki dla gier, inne dane i cokolwiek akurat trzeba.
+	<br><br></li>
+ <li>Zwolnić pamięć EMS.<br>
+	Zwalnianie logicznych stron pamięci wykonuje się funkcją 45h:
+	<ul>
+	 <li>ustawiamy AH=45h</li>
+	 <li>wpisujemy do DX uchwyt do przydzielonego nam obszaru, który chcemy zwolnić</li>
+	 <li>wywołujemy przerwanie 67h</li>
+	</ul>
+	<br><br></li>
+</ol>
+<P>
+Poniżej znajduje się przykładowy, gotowy program ilustrujący podane wyżej funkcjonalności
+(składnia NASM).
+</P>
+<PRE>
+org 100h
+
+start:
+	; pobierz segment przerwania sterownika EMS (67h)
+	xor	ax, ax
+	mov	es, ax
+	mov	ds, [es:(67h &lt;&lt; 2) + 2]
+
+	; szukaj znacznika
+	mov	si, 10	; DS:SI = adres znacznika w pamięci
+	mov	cx, znacznik_ems_dl
+	mov	ax, cs
+	mov	es, ax
+	mov	di, znacznik_ems	; ES:DI = adres zmiennej
+	repe	cmpsb
+	je	jest_ems
+
+	mov	ds, ax
+	mov	dx, brak_ems
+	mov	ah, 9
+	int	21h
+
+	mov	ax, 4c01h
+	int	21h
+
+jest_ems:
+	mov	ds, ax
+
+	; pobieramy segment ramki EMS
+	mov	ah, 41h
+	int	67h
+	test	ah, ah
+	jz	mamy_segment
+
+	mov	dx, brak_ramki
+	mov	ah, 9
+	int	21h
+
+	mov	ax, 4c02h
+	int	21h
+
+mamy_segment:
+	mov	[segment_ramki], bx
+
+	; sprawdź liczbę wolnych uchwytów pamięci EMS
+	mov	ah, 4bh
+	int	67h
+	test	ah, ah
+	jz	mamy_uzywane_uchwyty
+
+	mov	ah, 9
+	mov	dx, blad_uchwyty_u
+	int	21h
+
+	mov	ax, 4c03h
+	int	21h
+
+mamy_uzywane_uchwyty:
+	mov	cx, bx	; CX = liczba używanych uchwytów pamięci
+	mov	ax, 5402h
+	int	67h
+	test	ah, ah
+	jz	mamy_laczne_uchwyty
+
+	mov	ah, 9
+	mov	dx, blad_uchwyty
+	int	21h
+
+	mov	ax, 4c04h
+	int	21h
+
+mamy_laczne_uchwyty:
+	; BX = łączna liczba uchwytów
+	sub	bx, cx	; BX = liczba wolnych uchwytów
+	jnz	sa_uchwyty
+
+	mov	ah, 9
+	mov	dx, brak_uchwytow
+	int	21h
+
+	mov	ax, 4c05h
+	int	21h
+
+sa_uchwyty:
+	; alokujemy jedną logiczną stronę pamięci
+	mov	ah, 43h
+	mov	bx, 1
+	int	67h
+	test	ah, ah
+	jz	jest_alokacja
+
+	mov	ah, 9
+	mov	dx, blad_alok
+	int	21h
+
+	mov	ax, 4c06h
+	int	21h
+
+jest_alokacja:
+	mov	[uchwyt_pamieci], dx
+
+	; mapujemy logiczną stronę pamięci na pierwszą stronę
+	; fizyczną w ramce pamięci EMS
+	mov	ax, 4400h	; mapuj do zerowej strony fizycznej
+	xor	bx, bx		; pierwsza strona logiczna
+	;mov	dx, [uchwyt_pamieci]	; DX już zawiera uchwyt pamięci
+	int	67h
+	test	ah, ah
+	jz	zapelnij_pamiec
+
+	mov	ah, 9
+	mov	dx, blad_mapowanie
+	int	21h
+
+	; dealokacja pamięci
+	mov	ah, 45h
+	mov	dx, [uchwyt_pamieci]
+	int	67h
+
+	mov	ax, 4c07h
+	int	21h
+
+zapelnij_pamiec:
+	; pamięć przydzielona, zapełniamy ją
+	mov	ax, [segment_ramki]
+	mov	es, ax
+	mov	ax, 5a5ah
+	mov	cx, 1 &lt;&lt; 12	; CX = 16kB / 4 = 4kB
+	xor	di, di
+	rep	stosd
+
+	mov	ah, 9
+	mov	dx, wszystko_ok
+	int	21h
+
+koniec:
+	; dealokacja pamięci
+	mov	ah, 45h
+	mov	dx, [uchwyt_pamieci]
+	int	67h
+
+	mov	ax, 4c00h
+	int	21h
+
+
+
+uchwyt_pamieci	dw	0
+segment_ramki	dw	0
+znacznik_ems	db	'EMMXXXX0'
+znacznik_ems_dl	equ	$ - znacznik_ems
+brak_ems	db	'Brak EMS', 13, 10, '$'
+brak_ramki	db	'Nie mozna pobrac ramki EMS', 13, 10, '$'
+blad_uchwyty_u	db	'Nie mozna pobrac liczby uzywanych uchwytow', 13, 10, '$'
+blad_uchwyty	db	'Nie mozna pobrac lacznej liczby uchwytow', 13, 10, '$'
+brak_uchwytow	db	'Brak wolnych uchwytow', 13, 10, '$'
+blad_alok	db	'Blad alokacji pamieci', 13, 10, '$'
+blad_mapowanie	db	'Blad mapowania pamieci', 13, 10, '$'
+wszystko_ok	db	'Wszystko ukonczone prawidlowo', 13, 10, '$'</PRE>
+
+
+<P>
+Więcej przykładów można znaleźć pod adresami:
+</P>
+<ul>
+ <li><a href="http://www.phatcode.net/articles.php?id=155"
+	hreflang="en">www.phatcode.net/articles.php?id=155</a></li>
+ <li><a href="http://petesqbsite.com/sections/tutorials/zines/chronicles/3-ems.html"
+	hreflang="en">petesqbsite.com/sections/tutorials/zines/chronicles/3-ems.html</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr>
+<h2 class="nag"><a name="xms" id="xms">XMS</a></h2>
+
+<P>
+Pamięć <a href="http://pl.wikipedia.org/wiki/Extended_Memory_Specification"
+hreflang="pl">XMS</a> to po prostu pamięć RAM o adresach powyżej 1MB.
+</P>
+<P>
+Skoro pamięć XMS także jest położona powyżej granicy osiągalnej w trybie rzeczywistym,
+to także nie można się do
+niej bezpośrednio odwoływać. A skoro tak, to także potrzebny jest do niej sterownik
+(menadżer), taki jak HIMEM.SYS czy <a href="http://www.japheth.de/Jemm.html"
+hreflang="en">HimemX</a>. Sterownik taki udostępnia swoje funkcje,
+z których mogą korzystać programy.
+</P>
+<P>
+Menadżery XMS udostępniają mieszany interfejs - część funkcjonalności udostępniana
+jest przez przerwania, a część - poprzez bezpośrednie wywołanie funkcji w obszarze
+pamięci sterownika.
+</P>
+<P>
+Dostęp do pamięci XMS nie odbywa się za pomocą ramek stron, wiec trzeba mieć przygotowane
+własne bufory na dane. Oto algorytm wykorzystania pamięci XMS w swoim programie:
+</P>
+<ol>
+ <li>sprawdzić, czy sterownik XMS w ogóle jest załadowany</li>
+ <li>pobrać adres głównej funkcji sterownika XMS, z której będziemy korzystać</li>
+ <li>opcjonalnie sprawdzić, ile jest wolnej pamięci</li>
+ <li>zaalokować odpowiednią ilość pamięci (w obszarze powyżej 1MB)</li>
+ <li>korzystać z pamięci</li>
+ <li>zwolnić pamięć XMS (jeśli tego nie zrobimy, pamięć będzie zaznaczona jako niedostępna
+	dla innych programów aż do restartu komputera)</li>
+</ol>
+<P>
+Teraz omówimy te punkty po kolei. Funkcje XMS są udostępniane przez przerwanie 2Fh
+oraz przez funkcję znajdującą się wewnątrz sterownika, a wartość
+rejestru AX równa 1 po powrocie z większości wywołań oznacza brak błędu.
+</P>
+<ol>
+ <li>Sprawdzić, czy sterownik XMS w ogóle jest załadowany.<br>
+	Do tej czynności służy funkcja 4300h przerwania 2Fh:
+	<ul>
+	 <li>ustawiamy AX=4300h</li>
+	 <li>wywołujemy przerwanie 2Fh</li>
+	 <li>po pomyślnym wywołaniu (jeśli sterownik XMS jest dostępny) w rejestrze AH będzie wartość 80h</li>
+	</ul>
+	<br><br></li>
+ <li>Pobrać adres głównej funkcji sterownika XMS, z której będziemy korzystać.<br>
+	W tym celu należy wywołać funkcję 4310h przerwania 2Fh:
+	<ul>
+	 <li>ustawiamy AX=4310h</li>
+	 <li>wywołujemy przerwanie 2Fh</li>
+	 <li>po pomyślnym wywołaniu w parze rejestrów ES:BX będzie pełny adres
+		(segment i offset) funkcji obsługującej XMS, którą będziemy wywoływać</li>
+	</ul>
+	<br><br></li>
+ <li>Opcjonalnie sprawdzić, ile jest wolnej pamięci.<br>
+	Do tego służy czynność numer 8 funkcji obsługującej XMS:
+	<ul>
+	 <li>ustawiamy AH=8</li>
+	 <li>wywołujemy funkcję obsługującą XMS (<span lang="en">CALL FAR</span>!)</li>
+	 <li>po pomyślnym wywołaniu w rejestrze DX będzie ilość wolnej pamięci XMS w kilobajtach</li>
+	</ul>
+	<br><br></li>
+ <li>Zaalokować odpowiednią ilość pamięci (w obszarze powyżej 1MB).<br>
+	Do alokacji pamięci służy czynność numer 9 funkcji obsługującej XMS:
+	<ul>
+	 <li>ustawiamy AH=9</li>
+	 <li>ustawiamy DX na liczbę kilobajtów, które chcemy zaalokować</li>
+	 <li>wywołujemy funkcję obsługującą XMS</li>
+	 <li>po pomyślnym wywołaniu w rejestrze DX będzie uchwyt do przydzielonego nam obszaru</li>
+	</ul>
+	<br><br></li>
+ <li>Korzystać z pamięci.<br>
+	W obszarach pamięci większych niż ten poniżej granicy 1MB można
+	przechowywać obrazy i dźwięki dla gier, inne dane i cokolwiek akurat trzeba.<br>
+	Problem w tym, że skoro w XMS nie ma ramki stron, gdzie możemy sobie mapować pamięć,
+	trzeba mieć własne bufory oraz sposób przekazania sterownikowi XMS informacji, że
+	chcemy przenieść gdzieś zawartość pamięci.<br>
+	Do opisu pojedynczej operacji przenoszenia zawartości pamięci służy taka struktura
+	(składnia NASM):
+	<pre>
+		struc struk_kopia_xms
+			dlugosc		resd	1
+			uchwyt_zrodla	resw	1
+			offset_zrodla	resd	1
+			uchwyt_celu	resw	1
+			offset_celu	resd	1
+		endstruc</pre>
+	Pola oznaczają kolejno:
+	<ul>
+	 <li>długość - liczba bajtów, które chcemy skopiować w tej operacji</li>
+	 <li>uchwyt źródła - uchwyt do pamięci XMS (otrzymany z alokacji), z którego pobrać dane.
+		Jeśli dane mają być kopiowane z pamięci konwencjonalnej, należy wstawić tu zero.</li>
+	 <li>offset źródła - adres początkowy w źródłowym obszarze pamięci, z którego pobierać dane.
+		Jeśli dane mają być kopiowane z pamięci konwencjonalnej, należy wstawić tu offset
+		(w młodszych dwóch bajtach) i segment (w starszych dwóch bajtach) bufora źródłowego.</li>
+	 <li>uchwyt celu - uchwyt do pamięci XMS (otrzymany z alokacji), do którego skopiować dane.
+		Jeśli dane mają być kopiowane do pamięci konwencjonalnej, należy wstawić tu zero.</li>
+	 <li>offset celu - adres początkowy w docelowym obszarze pamięci, do którego skopiować dane.
+		Jeśli dane mają być kopiowane do pamięci konwencjonalnej, należy wstawić tu offset
+		(w młodszych dwóch bajtach) i segment (w starszych dwóch bajtach) bufora źródłowego.</li>
+	</ul>
+	<br>
+	Odpowiednio wypełnioną strukturę przekazujemy do czynności 0Bh funkcji obsługującej XMS:
+	<ul>
+	 <li>ustawiamy AH=0Bh</li>
+	 <li>ustawiamy SI na adres wypełnionej struktury, opisanej powyżej</li>
+	 <li>wywołujemy funkcję obsługującą XMS</li>
+	</ul>
+	<br><br></li>
+ <li>Zwolnić pamięć XMS.<br>
+	Do dealokacji pamięci służy czynność numer 10 funkcji obsługującej XMS:
+	<ul>
+	 <li>ustawiamy AH=10</li>
+	 <li>ustawiamy DX na uchwyt do przydzielonego nam obszaru, który chcemy zwolnić</li>
+	 <li>wywołujemy funkcję obsługującą XMS</li>
+	</ul>
+	<br><br></li>
+</ol>
+<P>
+Poniżej znajduje się przykładowy, gotowy program pokazujący wymienione wyżej czynności
+(składnia NASM). Zauważcie, że wywołania funkcji obsługującej XMS muszą być wywołaniami dalekimi
+(<span lang="en">CALL FAR</span>), gdyż znajduje się ona w innym segmencie.
+</P>
+<PRE>
+org 100h
+
+start:
+	; sprawdź, czy XMS jest zainstalowane
+	mov	ax, 4300h
+	int	2fh
+	cmp	al, 80h
+	je	jest_xms
+
+	mov	dx, brak_ster_xms
+	mov	ah, 9
+	int	21h
+
+	mov	ax, 4c01h
+	int	21h
+
+jest_xms:
+	; pobierz adres punktu wejścia do XMS (funkcji sterującej)
+	mov	ax, 4310h
+	int	2fh
+	mov	[funkcja_xms], bx
+	mov	[funkcja_xms+2], es
+
+	; sprawdź ilość wolnej pamięci XMS
+	mov	ah, 8
+	call	far [funkcja_xms]
+	test	dx, dx
+	jnz	mamy_pamiec
+
+	mov	ah, 9
+	mov	dx, brak_pamieci_xms
+	int	21h
+
+	mov	ax, 4c02h
+	int	21h
+
+mamy_pamiec:
+	; alokujemy pamięć równie dużą, co nasz bufor
+	mov	ah, 9
+	mov	dx, bufor_dl &gt;&gt; 10	; liczba kilobajtów
+	call	far [funkcja_xms]
+	cmp	ax, 1
+	je	jest_alokacja
+
+	mov	ah, 9
+	mov	dx, blad_alok
+	int	21h
+
+	mov	ax, 4c03h
+	int	21h
+
+jest_alokacja:
+	mov	[uchwyt_pamieci], dx
+
+	; pamięć przydzielona, zapełniamy ją
+	mov	dword [opis_kopiowania + dlugosc], bufor_dl
+	mov	word [opis_kopiowania + uchwyt_zrodla], 0	; pamięć RAM
+	mov	word [opis_kopiowania + offset_zrodla], bufor
+	mov	word [opis_kopiowania + offset_zrodla+2], ds
+	mov	[opis_kopiowania + uchwyt_celu], dx
+	mov	dword [opis_kopiowania + offset_celu], 0
+	mov	ah, 0bh
+	mov	si, opis_kopiowania
+	call	far [funkcja_xms]
+	cmp	ax, 1
+	je	kopia_ok
+
+	mov	ah, 9
+	mov	dx, blad_kopiowanie
+	int	21h
+
+	; dealokacja pamięci
+	mov	ah, 10
+	mov	dx, [uchwyt_pamieci]
+	call	far [funkcja_xms]
+
+	mov	ax, 4c04h
+	int	21h
+
+kopia_ok:
+	mov	ah, 9
+	mov	dx, wszystko_ok
+	int	21h
+
+	; dealokacja pamięci
+	mov	ah, 10
+	mov	dx, [uchwyt_pamieci]
+	call	far [funkcja_xms]
+
+	mov	ax, 4c00h
+	int	21h
+
+
+
+funkcja_xms		dd	0
+uchwyt_pamieci		dw	0
+brak_ster_xms		db	'Brak sterownika XMS', 13, 10, '$'
+brak_pamieci_xms	db	'Brak wolnej pamieci XMS', 13, 10, '$'
+blad_alok		db	'Blad alokacji pamieci', 13, 10, '$'
+blad_kopiowanie		db	'Blad kopiowania pamieci', 13, 10, '$'
+wszystko_ok		db	'Wszystko ukonczone prawidlowo', 13, 10, '$'
+
+bufor			times	(1 &lt;&lt; 14) db 0
+bufor_dl		equ	$ - bufor
+
+struc struk_kopia_xms
+	dlugosc		resd	1
+	uchwyt_zrodla	resw	1
+	offset_zrodla	resd	1
+	uchwyt_celu	resw	1
+	offset_celu	resd	1
+endstruc
+
+opis_kopiowania		istruc struk_kopia_xms</pre>
+
+
+
+
+
+<P>
+Więcej przykładów można znaleźć pod adresami:
+</P>
+<ul>
+ <li><a href="http://petesqbsite.com/sections/tutorials/zines/chronicles/1-xms.html"
+	hreflang="en">petesqbsite.com/sections/tutorials/zines/chronicles/1-xms.html</a></li>
+ <li><a href="http://computer-programming-forum.com/46-asm/7e08914900e20d5e.htm"
+	hreflang="en">computer-programming-forum.com/46-asm/7e08914900e20d5e.htm</a></li>
+</ul>
+
+
+
+
+
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

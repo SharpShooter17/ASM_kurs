@@ -1,0 +1,222 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS, część 12 - Linia poleceń i środowisko </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Prev"     hreflang="pl" lang="en" href="a_kurs11.htm">
+<link rel="Next"     hreflang="pl" lang="en" href="a_kurs13.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Kurs języka asembler">
+<META NAME="Keywords" CONTENT="kurs, asm, asembler, assembler, linia poleceń, PSP, środowisko,
+	command line, environment">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<div class="c">Jak pisać programy w języku asembler?<BR>
+	<h1 class="nag">Część 12 - Czego od nas pragną, czyli linia poleceń programu.
+	 Zmienne środowiska</h1></div>
+
+<P>
+Teraz zajmiemy się dość istotną sprawą z punktu widzenia programisty i użytkownika
+oprogramowania: linią poleceń. Nie wszyscy lubią podawać dane programowi w czasie jego
+pracy i odpowiadać na pytania o dane. Często (o ile jest to możliwe) można
+tego oszczędzić i zamiast bezustannie zadawać użytkownikowi pytania, przeczytać, co wpisano
+nam w linię poleceń. Umożliwia to pisanie programów, które raz uruchomione z prawidłową linią
+poleceń nie pytają już się o nic a tylko wykonują swoją pracę bez przeszkadzania
+użytkownikom.
+</P>
+<P>
+Przejdźmy więc do szczegółów. Wszystkie operacje, które wykonamy, będą się opierać na
+założeniu, że w swoim programie nie zrobiliście absolutnie nic z rejestrem DS. Jeśli go
+zmieniliście, to użyjcie tej funkcji (opis oczywiście z
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+	>Listy Przerwań Ralfa <span lang="en">Brown</span>'a</A>):</P>
+	<BR><a href="#a_kurs1201" tabindex="1" class="bezdruk">(przeskocz int 21h, ah=62h)</a>
+<PRE lang="en" title="int 21h, ah=62h">
+	INT 21 - DOS 3.0+ - GET CURRENT PSP ADDRESS
+        	AH = 62h
+	Return: BX = segment of PSP for current process</PRE>
+<P><a name="a_kurs1201" id="a_kurs1201">i otrzymaną w BX wartość wpiszcie do DS</a>.
+</P>
+<P>
+Mając oryginalny DS (wtedy pokazuje on na <span lang="en">Program Segment Prefix</span> - PSP),
+ można w nim znaleźć wiele ciekawych informacji:</P>
+<UL>
+ <LI>bajt pod [ds:80h] mówi nam, ile znaków znajduje się na linii poleceń, bez kończącego
+	znaku nowej linii (Enter = 13 ASCII).
+	<BR><BR></LI>
+ <LI>od [ds:81h] do [ds:0FFh] jest linia poleceń. Jak widać, ma ona długość 128 znaków i tylko
+	tyle możemy wpisać, uruchamiając nasz program. Teraz również widać, dlaczego programy
+	typu COM zaczynają się od adresu 100h - po prostu wcześniej nie mogą, bo CS=DS.
+	<BR><BR></LI>
+ <LI>pod [ds:2ch] znajduje się numer segmentu, w którym umieszczono kopię zmiennych
+	środowiskowych (tych ustawianych komendą SET, na przykład w autoexec.bat) do wykorzystania
+	przez nasz program. Zmienne środowiskowe zapisane są od początku segmentu i oddzielone
+	od siebie bajtami zerowymi. Dwa bajty zerowe pod rząd oznaczają koniec zmiennych.
+	</LI>
+</UL>
+<P>Wszystko ładnie wygląda w teorii, ale jak tego używać?
+Aby odpowiedzieć na to pytanie, napisałem ten oto krótki programik. Jedynym celem jego życia
+jest wyświetlenie długości jego linii poleceń, samej linii poleceń, numerów segmentów: kodu,
+danych i środowiska (dla porównania), oraz samych zmiennych środowiskowych (jeśli wyświetla
+się za dużo lub za mało, można zmienić liczbę na końcu programu - pokażę, którą).</P>
+
+<P>Oto kod (NASM):</P>
+	<BR><a href="#a_kurs1202" class="bezdruk">(przeskocz kod programu)</a>
+<PRE>
+; Program wyświetla własną linię poleceń i zmienne środowiskowe.
+;
+; Autor: Bogdan D.
+; kontakt: bogdandr (at) op (dot) pl
+;
+; kompilacja NASM:
+;   nasm -O999 -o liniap.obj -f obj liniap.asm
+;   alink liniap.obj  bibl\lib\bibldos.lib -c- -oEXE -m-
+; kompilacja FASM (stary format biblioteki - OMF):
+;   fasm liniap.asm liniap.obj
+;   alink liniap.obj  bibl\lib\bibldos.lib -c- -entry _start -oEXE -m-
+; kompilacja FASM (nowy format biblioteki - COFF):
+;   fasm liniap.asm liniap.obj
+;   ld -s -o liniap.exe liniap.obj bibl\lib\bibldos.a
+
+; dołączamy moją biblioteczkę
+%include &quot;bibl\incl\dosbios\nasm\std_bibl.inc&quot;
+%include &quot;bibl\incl\dosbios\nasm\do_nasma.inc&quot;
+
+.stack 400h			; program typu EXE musi mieć stos
+
+; FASM (stary format biblioteki - OMF):
+; format coff
+; include &quot;bibl\incl\dosbios\fasm\std_bibl.inc&quot;
+; use16
+; public start
+; public _start
+; i nic poza tym
+
+; FASM (nowy format biblioteki - COFF):
+; format coff
+; include &quot;bibl\incl\dosbios\fasm32\std_bibl.inc&quot;
+; public start
+; public _start
+; i nic poza tym
+
+
+start:
+_start:
+..start:			; miejsce startu programu
+	mov	si, 80h	; [ds:80h] - długość linii poleceń bez Entera
+	xor	eax, eax
+	mov	al, [si]	; AL = długość linii poleceń
+	pisz
+	db	&quot;Dlugosc linii polecen: &quot;, 0
+	pisz8			; wypisujemy AL
+	nwln			; przechodzimy do nowej linii
+
+	mov	cx, ax		; CX=długość linii poleceń,
+				; abyśmy wiedzieli,
+				; ile znaków należy wyświetlić
+	inc	si		; SI=81h. [ds:81h] to początek
+				; linii poleceń
+	pisz
+	db	&quot;Linia polecen=&quot;, 0
+	pisz_dl			; wypisujemy CX znaków spod DS:SI,
+				; czyli całą linię poleceń
+	nwln
+
+	mov	ax, cs
+	pisz
+	db	&quot;Segment kodu programu CS=&quot;, 0
+	pisz16			; wyświetlamy AX=CS
+	nwln
+	mov	ax, ds
+	pisz
+	db	&quot;Segment danych DS=&quot;, 0
+	pisz16			; wyświetlamy AX=DS
+	nwln
+
+	mov	ax, [ds:2ch]
+	pisz
+	db	&quot;Segment zmiennych srodowiskowych: DS:[2ch]=&quot;,0
+	pisz16			; wyświetlamy AX=segment środowiska
+	nwln
+
+	; wyłączyć poniższe linie aż do "wypisz_srod" w przypadku FASMa z
+	; nowym formatem biblioteki (32-bitowy COFF nie pozwala na
+	; manipulację segmentami)
+	mov	ds, ax		; DS = segment środowiska
+	xor	si, si		; SI = początek segmentu
+	pisz
+	db	&quot;Zmienne srodowiskowe: &quot;, 0
+
+	mov	ah, 0eh		; funckja wypisywania znaku
+	dec	si		; tylko po to, aby najbliższe INC SI
+				; zadziałało prawidłowo i ustawiło nas z
+				; powrotem na 0
+wypisz_srod:
+	nwln			; przejdź do nowej linii
+wypisz:
+	inc	si		; SI teraz pokazuje na kolejny znak
+	cmp	si, 400	; żeby nie było za długo -
+			; to tę liczbę MOŻNA ZMIENIĆ
+	ja	koniec
+
+	mov	al, [si]	; pobierz znak spod [DS:SI]
+	test	al, al		; czy bajt zerowy?
+	jz	sprawdz		; jeśli tak, to sprawdzimy,
+				; czy nie dwa pod rząd
+
+	int	10h		; wypisz znak
+	jmp	short	wypisz	; i w kółko od nowa
+
+sprawdz:
+	cmp	byte [si+1], 0
+	jne	wypisz_srod
+
+koniec:
+	wyjscie</PRE>
+
+<P>
+<a name="a_kurs1202" id="a_kurs1202">Jak widać, nie było to aż takie</a>
+ trudne jak się mogło zdawać na początku. Właśnie poznaliście
+kolejną rzecz, która jest łatwa w użyciu, a możliwości której są duże. Teraz będziecie mogli
+śmiało zacząć pisać programy, których jedynym kanałem komunikacyjnym z użytkownikiem
+będzie linia poleceń, co znacznie uprości ich obsługę.<BR>
+<BR>
+Tylko pamiętajcie o dodaniu kodu wyświetlającego sposób użycia programu, gdy nie podano mu
+żadnych parametrów.
+</P>
+
+<br><br>
+<div class="bezdruk">
+<a accesskey="3" hreflang="pl" href="a_kurs11.htm">Poprzednia część kursu</a> (Alt+3)<BR>
+<a accesskey="4" hreflang="pl" href="a_kurs13.htm">Kolejna część kursu</a> (Alt+4)<br>
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+
+<BR><HR>
+<h2 class="nag">Ćwiczenia</h2>
+<OL>
+ <LI>Napisz program, który utworzy plik podany jako parametr. Jeśli podano drugi parametr
+	(oddzielony od pierwszego spacją), zapisz jego wartość do tego pliku. Jeśli nie podano
+	żadnych parametrów, niech program wypisze stosowną wiadomość.<BR><BR></LI>
+ <LI>Napisz program, który oblicza <acronym title="Największy Wspólny Dzielnik">NWD</acronym>
+ 	 (patrz część 8) dwóch liczb podanych na linii poleceń.
+	Jeśli nie podano wystarczającej liczby parametrów, niech program wyświetli stosowną
+	wiadomość.</LI>
+</OL>
+
+</BODY></HTML>

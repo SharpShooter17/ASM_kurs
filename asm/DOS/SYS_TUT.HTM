@@ -1,0 +1,599 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Sterowniki .SYS </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Pisanie plików - sterowników .SYS">
+<META NAME="Keywords" CONTENT="sterowniki, .SYS, assembler, asm, asembler">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Pisanie plików .SYS</h1>
+
+<P>
+Sterowniki w postaci plików .SYS dzielą się na 2 rodzaje:</P>
+<UL>
+<LI>Nie-<acronym lang="en" title="Disk Operating System">DOS</acronym>-owe pliki .SYS
+ (ładowane z <span lang="en">config</span>.sys poleceniem <span lang="en">DEVICE</span>=...)
+ zazwyczaj zawierają sterowniki takich urządzeń zewnętrznych jak na przykład <span lang="en">CD-ROM</span>.</LI>
+<LI> Pliki .SYS systemu DOS
+- na przykład MSDOS.SYS czy IO.SYS. Te pliki zawierają sterowniki urządzeń standardowych, jak konsola
+CON czy drukarka PRN.<BR></LI>
+</UL>
+
+<P>Wszystkie te pliki łączy wspólna struktura, którą postaram się tutaj przedstawić.
+Informacje podane przeze mnie są wycinkiem z dokumentu
+<q lang="en">Programmer's Technical Reference for MSDOS and the IBM PC</q>,
+ którego kopię można znaleźć na stronach
+<A HREF="http://www.o3one.org/hwdocs/bios_doc/dosref22.html" hreflang="en"
+>systemu O3one</A> (720 <abbr title="kilobajt">kB</abbr>).</P>
+<P>
+
+Pliki .SYS zaczynają się od adresu 0 (org 0), a nagłówek takiego pliku składa się z pięciu elementów:</P>
+	<BR><a href="#sys_tut01" tabindex="1" class="bezdruk">(przeskocz elementy nagłówka)</a>
+<UL>
+ <LI> DWORD - pełny adres (najpierw <span lang="en">offset</span>, potem segment)
+ 	do następnego takiego nagłówka jak ten, jeśli
+	nasz plik .SYS obsługuje więcej niż jedno urządzenie. Jeśli mamy tylko jeden sterownik w
+	naszym pliku, wpisujemy tutaj wartość -1, czyli FFFF:FFFF.</LI>
+ <LI> WORD - atrybut urządzenia (opisany dalej)</LI>
+ <LI> WORD - <span lang="en">offset</span> <q>procedury strategii</q> danego sterownika (opisane dalej)</LI>
+ <LI> WORD - <span lang="en">offset</span> <q>procedury przerwania</q> danego sterownika (opisane dalej)</LI>
+ <LI> 8 bajtów - nazwa (urządzenie znakowe) dopełniana w razie potrzeby spacjami
+ 	 do ośmiu znaków lub liczba jednostek (urządzenie blokowe)</LI>
+</UL>
+<P><a name="sys_tut01" id="sys_tut01">Urządzenie znakowe to takie</A>,
+ które może wysyłać/odbierać pojedyncze bajty, na przykład CON, PRN, AUX.
+Można je otwierać jak normalne pliki.<BR>
+Urządzenie blokowe to takie, które operują na blokach danych i są to zazwyczaj dyski.
+</P>
+
+	<BR><a href="#sys_tut02" class="bezdruk">(przeskocz tabelę atrybutów urządzenia)</a>
+
+<TABLE summary="Ta tabela przedstawia bity atrybutu urządzenia i ich znaczenie">
+<CAPTION>Bity atrybutu i ich znaczenie</CAPTION>
+<TR><TH style="width:10%;" id="nr"> Numer bitu </TH> <TH id="opis"> Znaczenie </TH></TR>
+<TR><TD class="c" headers="nr"> 0 </TD> <TD headers="opis"> =0 - to urządzenie nie jest standardowym urządzeniem wejścia<BR>
+			 &nbsp;&nbsp;=1 - to urządzenie jest standardowym urządzeniem wejścia </TD></TR>
+<TR><TD class="c" headers="nr"> 1 </TD> <TD headers="opis"> =0 - to urządzenie nie jest standardowym urządzeniem wyjścia<BR>
+			 &nbsp;&nbsp;=1 - to urządzenie jest standardowym urządzeniem wyjścia </TD></TR>
+<TR><TD class="c" headers="nr"> 2 </TD> <TD headers="opis"> =0 - to urządzenie nie jest urządzeniem NUL<BR>
+			 &nbsp;&nbsp;=1 - to urządzenie jest urządzeniem NUL</TD></TR>
+<TR><TD class="c" headers="nr"> 3 </TD> <TD headers="opis"> =0 - to urządzenie nie jest urządzeniem <span lang="en">CLOCK</span><BR>
+			 &nbsp;&nbsp;=1 - to urządzenie jest urządzeniem <span lang="en">CLOCK</span></TD></TR>
+<TR><TD class="c" headers="nr"> 4 </TD> <TD headers="opis"> =0 - należy używać standardowych procedur we/wy CON<BR>
+			 &nbsp;&nbsp;=1 - należy używać szybkich procedur we/wy ekranu (int 29h)</TD></TR>
+<TR><TD class="c" headers="nr"> 5-10 </TD> <TD headers="opis"> zarezerwowane, muszą być równe 0</TD></TR>
+<TR><TD class="c" headers="nr"> 11 </TD> <TD headers="opis"> =0 - to urządzenie nie obsługuje wymiennych nośników (domyślne dla DOS 2.x)<BR>
+			 &nbsp;&nbsp;&nbsp;=1 - to urządzenie obsługuje wymienne nośniki (tylko dla DOS 3.0+)</TD></TR>
+<TR><TD class="c" headers="nr"> 12 </TD> <TD headers="opis"> zarezerwowane, musi być równy 0</TD></TR>
+<TR><TD class="c" headers="nr"> 13 </TD> <TD headers="opis"> =0 - format IBM (urządzenia blokowe)<BR>
+			 &nbsp;&nbsp;&nbsp;=1 - format nie-IBM (urządzenia blokowe)<BR>
+			 &nbsp;&nbsp;&nbsp;=1 - obsługuje funkcję zapisywania danych aż do stanu zajętości
+				(<q lang="en">output till busy</q>, urządzenia znakowe)</TD></TR>
+<TR><TD class="c" headers="nr"> 14 </TD> <TD headers="opis"> =0 - nie obsługuje IOCTL<BR>
+			 &nbsp;&nbsp;&nbsp;=1 - obsługuje IOCTL</TD></TR>
+<TR><TD class="c" headers="nr"> 15 </TD> <TD headers="opis"> =0 - urządzenie blokowe<BR>
+			 &nbsp;&nbsp;&nbsp;=1 - urządzenie znakowe</TD></TR>
+</TABLE>
+<P>
+<a name="sys_tut02" id="sys_tut02">Ostatnie pole w nagłówku</a>
+ to nazwa urządzenia (w przypadku urządzeń znakowych) lub liczba
+jednostek/dysków obsługiwanych przez ten sterownik (urządzenia blokowe).
+</P>
+
+
+
+
+
+
+<HR>
+<h2 class="nag"><q>Procedura strategii</q> (<span lang="en">strategy routine</span>).</h2>
+
+	<BR><a href="#sys_tut03" class="bezdruk">(przeskocz procedurę strategii)</a>
+<P>
+Za każdym razem, jak DOS chce coś od naszego sterownika, uruchamia procedurę strategii,
+ podając w parze rejestrów ES:BX adres nagłówka żądania (<span lang="en">request header</span>).
+ Zawiera on informacje o tym, co mamy zrobić.<BR>
+Jedynym obowiązkowym zadaniem tej procedury jest zachowanie adresu z ES:BX w zmiennej
+lokalnej, aby można było potem odczytywać żądania w procedurze przerwania, która uruchamiana jest
+ zaraz po procedurze strategii. Jeśli chcemy zrobić coś więcej, musimy
+zachować wszystkie rejestry (łącznie z flagami), które zmieniamy.<BR>
+Procedura kończy się wywołaniem RETF, gdyż DOS uruchamia nasz sterownik wykonując
+ <span lang="en">CALL FAR</span>.</P>
+<P>
+Tak więc najprostszy przykład sprowadza się do:</P>
+<PRE title="zachowywanie adresu nagłówka żądania">
+	mov	word cs:[nagl_zad], bx		; NASM : [cs:nagl_zad]
+	mov	word cs:[nagl_zad+2], es	; NASM : [cs:nagl_zad+2]
+	retf</PRE>
+
+<BR>
+
+
+
+
+
+
+<HR>
+<h2 class="nag"><a name="sys_tut03" id="sys_tut03"><q>Procedura przerwania</q></a>
+		 (<span lang="en">interrupt routine</span>).</h2>
+
+	<BR><a href="#sys_tut04" class="bezdruk">(przeskocz procedurę przerwania)</a>
+<P>
+Ta procedura jest odpowiedzialna za wykonywanie poleceń od systemu. Polecenia te są zawarte w
+nagłówku żądania, który teraz omówię.<BR>
+W procedurze przerwania również należy zachować wszystkie modyfikowane rejestry i wrócić do DOSa
+ poleceniem RETF. Procedura przerwania jest uruchamiana przez DOS tuż po powrocie z
+ procedury strategii, która musi zachować bieżący adres nagłówka żądania.
+</P>
+
+	<BR><a href="#sys_tut05" class="bezdruk">(przeskocz opis nagłówka żądania)</a>
+
+<TABLE summary="Ta tabela opisuje nagłówek żądania, które sterownik otrzymuje od systemu">
+<CAPTION> Nagłówek żądania </CAPTION>
+<TR><TH style="width:10%;" id="dist"> Odległość od początku </TH>
+	<TH style="width:10%;" id="len"> Długość </TH>
+	<TH id="zaw"> Zawartość </TH></TR>
+
+<TR class="c"><TD headers="dist"> 0 </TD> <TD headers="len"> 1 bajt </TD> <TD headers="zaw"> Długość w bajtach całego nagłówka i ewentualnych danych</TD></TR>
+<TR class="c"><TD headers="dist"> 1 </TD> <TD headers="len"> 1 </TD> <TD headers="zaw"> Kod podjednostki w urządzeniach blokowych.
+				 Nieistotne dla urządzeń znakowych</TD></TR>
+<TR class="c"><TD headers="dist"> 2 </TD> <TD headers="len"> 1 </TD> <TD headers="zaw"> Kod rozkazu</TD></TR>
+<TR class="c"><TD headers="dist"> 3 </TD> <TD headers="len"> 2 </TD> <TD headers="zaw"> Status wykonania</TD></TR>
+<TR class="c"><TD headers="dist"> 5 </TD> <TD headers="len"> 8 </TD> <TD headers="zaw"> zarezerwowane dla DOSa</TD></TR>
+<TR class="c"><TD headers="dist"> 0Ch </TD> <TD headers="len"> różna </TD> <TD headers="zaw"> Dane odpowiednie dla operacji</TD></TR>
+
+</TABLE>
+
+<P><a name="sys_tut05" id="sys_tut05">Kod podjednostki w urządzeniach blokowych</a>
+ jest istotny, gdy nasz sterownik obsługuje więcej niż 1 urządzenie.</P>
+
+	<BR><a href="#sys_tut06" class="bezdruk">(przeskocz listę rozkazów)</a>
+
+<TABLE summary="Ta tabela opisuje rozkazy, jakie może otrzymać sterownik">
+<CAPTION> Kod rozkazu </CAPTION>
+<TR><TH style="width:10%;" id="kod"> Kod </TH> <TH style="width:25%;" id="nazwa"> Nazwa </TH>
+	<TH id="funkcja"> Funkcja </TH> </TR>
+
+<TR><TD class="c" headers="kod"> 0 </TD> <TD class="c" headers="nazwa"> <span lang="en">INIT</span> </TD>
+		 <TD headers="funkcja"> Inicjalizacja sterownika. Używane tylko raz.</TD></TR>
+<TR><TD class="c" headers="kod"> 1 </TD> <TD class="c" headers="nazwa"> <span lang="en">MEDIA CHECK</span> </TD>
+		 <TD headers="funkcja"> Sprawdzanie, czy zmieniono dysk od ostatniego sprawdzenia.
+		Używane tylko w urządzeniach blokowych. Urządzenia znakowe nic nie robią.</TD></TR>
+<TR><TD class="c" headers="kod"> 2 </TD> <TD class="c" headers="nazwa"> <span lang="en">BUILD BPB</span> </TD>
+		 <TD headers="funkcja"> Stworzenie nowego <span lang="en">BIOS Parameter Block</span> (BPB).
+		Używane tylko w urządzeniach blokowych. Urządzenia znakowe nic nie robią.</TD></TR>
+<TR><TD class="c" headers="kod"> 3 </TD> <TD class="c" headers="nazwa"> <span lang="en">IOCTL INPUT</span> </TD>
+		 <TD headers="funkcja"> Odczyt IOCTL.
+		Uruchamiane tylko wtedy, gdy urządzenie ma ustawiony bit IOCTL.</TD></TR>
+<TR><TD class="c" headers="kod"> 4 </TD> <TD class="c" headers="nazwa"> <span lang="en">INPUT</span> </TD>
+		 <TD headers="funkcja"> Odczyt danych.</TD></TR>
+<TR><TD class="c" headers="kod"> 5 </TD> <TD class="c" headers="nazwa"> <span lang="en">NONDESTRUCTIVE INPUT NO WAIT</span> </TD>
+		 <TD headers="funkcja"> Odczyt danych.</TD></TR>
+<TR><TD class="c" headers="kod"> 6 </TD> <TD class="c" headers="nazwa"> <span lang="en">INPUT STATUS</span> </TD>
+		 <TD headers="funkcja"> Stan odczytu </TD></TR>
+<TR><TD class="c" headers="kod"> 7 </TD> <TD class="c" headers="nazwa"> <span lang="en">INPUT FLUSH</span> </TD>
+		 <TD headers="funkcja"> Opróżnienie kolejki wejściowej </TD></TR>
+<TR><TD class="c" headers="kod"> 8 </TD> <TD class="c" headers="nazwa"> <span lang="en">OUTPUT</span> </TD>
+		 <TD headers="funkcja"> Zapis danych. </TD></TR>
+<TR><TD class="c" headers="kod"> 9 </TD> <TD class="c" headers="nazwa"> <span lang="en">OUTPUT</span> </TD>
+		 <TD headers="funkcja"> Zapis danych z weryfikacją. </TD></TR>
+<TR><TD class="c" headers="kod"> 10 </TD> <TD class="c" headers="nazwa"> <span lang="en">OUTPUT STATUS</span> </TD>
+		 <TD headers="funkcja"> Stan zapisu </TD></TR>
+<TR><TD class="c" headers="kod"> 11 </TD> <TD class="c" headers="nazwa"> <span lang="en">OUTPUT FLUSH</span> </TD>
+		 <TD headers="funkcja"> Opróżnienie kolejki wyjściowej </TD></TR>
+<TR><TD class="c" headers="kod"> 12 </TD> <TD class="c" headers="nazwa"> <span lang="en">IOCTL OUTPUT</span> </TD>
+		 <TD headers="funkcja"> Zapis IOCTL. Uruchamiane tylko wtedy, gdy urządzenie ma ustawiony bit IOCTL.</TD></TR>
+<TR><TD class="c" headers="kod"> 13 </TD> <TD class="c" headers="nazwa"> <span lang="en">DEVICE OPEN</span> </TD>
+		 <TD headers="funkcja"> Uruchamiane tylko wtedy, gdy urządzenie ma ustawiony bit <span lang="en">OPEN/CLOSE/RM</span>.</TD></TR>
+<TR><TD class="c" headers="kod"> 14 </TD> <TD class="c" headers="nazwa"> <span lang="en">DEVICE CLOSE</span> </TD>
+		 <TD headers="funkcja"> Uruchamiane tylko wtedy, gdy urządzenie ma ustawiony bit <span lang="en">OPEN/CLOSE/RM</span>.</TD></TR>
+<TR><TD class="c" headers="kod"> 15 </TD> <TD class="c" headers="nazwa"> <span lang="en">REMOVEABLE MEDIA</span> </TD>
+		 <TD headers="funkcja"> Uruchamiane tylko wtedy, gdy urządzenie blokowe ma ustawiony bit <span lang="en">OPEN/CLOSE/RM</span>.</TD></TR>
+<TR><TD class="c" headers="kod"> 16 </TD> <TD class="c" headers="nazwa"> <span lang="en">OUTPUT UNTIL BUSY</span> </TD>
+		 <TD headers="funkcja"> Uruchamiane tylko wtedy, gdy urządzenie znakowe ma ustawiony bit 13.</TD></TR>
+</TABLE>
+<P><a name="sys_tut06" id="sys_tut06">Najważniejsze rozkazy</a> są opisane dalej.</P>
+
+
+	<BR><a href="#sys_tut07" class="bezdruk">(przeskocz listę wyników działania)</a>
+<TABLE summary="Ta tabela przedstawia możliwe wyniki działania sterownika">
+<CAPTION> Status wykonania zadania </CAPTION>
+<TR> <TH style="width:20%;" id="bit"> bit </TH> <TH id="znaczenie"> Znaczenie </TH> </TR>
+<TR class="c"> <TD headers="bit"> 0-7 </TD> <TD headers="znaczenie"> Kod błędu, gdy bit15 = 1 </TD></TR>
+<TR class="c"> <TD headers="bit"> 8 </TD> <TD headers="znaczenie"> =1 oznacza <q>Operacja zakończona</q> </TD></TR>
+<TR class="c"> <TD headers="bit"> 9 </TD> <TD headers="znaczenie"> =1 oznacza <q>Urządzenie zajęte</q> </TD></TR>
+<TR class="c"> <TD headers="bit"> 10-14 </TD> <TD headers="znaczenie"> Zarezerwowane dla DOSa </TD></TR>
+<TR class="c"> <TD headers="bit"> 15 </TD> <TD headers="znaczenie"> =1 oznacza <q>błąd</q> </TD></TR>
+</TABLE>
+<BR>
+
+
+	<BR><a href="#sys_tut04" class="bezdruk">(przeskocz listę błędów sterownika)</a>
+<TABLE summary="Ta tabela przedstawia możliwe błędy sterownika">
+<CAPTION> <a name="sys_tut07" id="sys_tut07">Znaczenie numerów błędów</a> </CAPTION>
+<TR> <TH style="width:10%;" id="errn"> numer </TH> <TH id="err"> Typ błędu </TH> </TR>
+<TR class="c"> <TD headers="errn"> 0 </TD> <TD headers="err"> naruszenie ochrony przed zapisem </TD></TR>
+<TR class="c"> <TD headers="errn"> 1 </TD> <TD headers="err"> nieznana jednostka </TD></TR>
+<TR class="c"> <TD headers="errn"> 2 </TD> <TD headers="err"> urządzenie nie jest gotowe </TD></TR>
+<TR class="c"> <TD headers="errn"> 3 </TD> <TD headers="err"> nieznana komenda </TD></TR>
+<TR class="c"> <TD headers="errn"> 4 </TD> <TD headers="err"> błąd CRC </TD></TR>
+<TR class="c"> <TD headers="errn"> 5 </TD> <TD headers="err"> nieprawidłowa długość struktury żądania dostępu do dysku </TD></TR>
+<TR class="c"> <TD headers="errn"> 6 </TD> <TD headers="err"> błąd wyszukania (<span lang="en">seek error</span>) </TD></TR>
+<TR class="c"> <TD headers="errn"> 7 </TD> <TD headers="err"> nieznany nośnik </TD></TR>
+<TR class="c"> <TD headers="errn"> 8 </TD> <TD headers="err"> sektor nie znaleziony </TD></TR>
+<TR class="c"> <TD headers="errn"> 9 </TD> <TD headers="err"> koniec papieru w drukarce </TD></TR>
+<TR class="c"> <TD headers="errn"> 10 </TD> <TD headers="err"> błąd zapisu </TD></TR>
+<TR class="c"> <TD headers="errn"> 11 </TD> <TD headers="err"> błąd odczytu </TD></TR>
+<TR class="c"> <TD headers="errn"> 12 </TD> <TD headers="err"> błąd ogólny </TD></TR>
+<TR class="c"> <TD headers="errn"> 13 </TD> <TD headers="err"> zarezerwowane </TD></TR>
+<TR class="c"> <TD headers="errn"> 14 </TD> <TD headers="err"> zarezerwowane </TD></TR>
+<TR class="c"> <TD headers="errn"> 15 </TD> <TD headers="err"> nieprawidłowa zmiana dysku </TD></TR>
+</TABLE>
+<BR><BR>
+
+
+
+
+
+
+
+<HR>
+<h2 class="nag"> <a name="sys_tut04" id="sys_tut04">Rozkazy</a> </h2>
+
+	<BR><a href="#sys_tut08" class="bezdruk">(przeskocz listę rozkazów sterownika)</a>
+<UL>
+ <LI><span lang="en">INIT</span>
+
+	<BR><a href="#sys_tut09" class="bezdruk">(przeskocz rozkaz init)</a>
+ <P>
+
+ES:BX wskazuje na strukturę zawierającą nagłówek żądania i dane. Ta struktura wygląda tak:</P>
+
+<TABLE summary="Tabela opisująca strukturę zawierającą nagłówek żądania">
+<caption>Nagłówek żądania</caption>
+<TR><TH style="width:10%;" id="odl"> Odległość od początku </TH> <TH style="width:10%;" id="dl"> Długość </TH>
+	 <TH id="cont"> Zawartość </TH></TR>
+
+<TR><TD class="c" headers="odl"> 0 </TD> <TD class="c" headers="dl"> 13 bajtów </TD> <TD headers="cont"> Nagłówek żądania</TD></TR>
+<TR><TD class="c" headers="odl"> 0Dh </TD> <TD class="c" headers="dl"> 1 </TD> <TD headers="cont"> Liczba jednostek w urządzeniach blokowych.
+				 Nieistotne dla urządzeń znakowych</TD></TR>
+<TR><TD class="c" headers="odl"> 0Eh? </TD> <TD class="c" headers="dl"> 4 </TD> <TD headers="cont"> Offset i segment końca kodu naszego sterownika.
+			Mówi DOSowi, ile pamięci można zwolnić (wymieniony wcześniej dokument podaje
+			tutaj offset 11h, który nie jest prawidłowy).</TD></TR>
+<TR><TD class="c" headers="odl"> 12h? </TD> <TD class="c" headers="dl"> 4 </TD> <TD headers="cont"> Wskaźnik na tablicę BPB (nieistotne dla urządzeń znakowych)
+			/ wskaźnik na resztę argumentów (wymieniony wcześniej dokument podaje
+			tutaj offset 15h).</TD></TR>
+<TR><TD class="c" headers="odl"> 16h? </TD> <TD class="c" headers="dl"> 1 </TD> <TD headers="cont"> numer dysku (DOS 3.0+) (wymieniony wcześniej dokument podaje
+			tutaj offset 19h).</TD></TR>
+</TABLE>
+
+<P>W czasie inicjalizacji należy:</P>
+  <OL>
+   <LI>ustawić liczbę jednostek (tylko w urządzeniach blokowych). Wpisać 0, jeśli nie można
+	uruchomić urządzenia.</LI>
+   <LI>ustawić wskaźnik na tablicę BPB (tylko w urządzeniach blokowych)</LI>
+   <LI>wykonać czynności inicjalizacyjne (na przykład modemów, drukarek)</LI>
+   <LI>ustawić adres końca rezydentnego kodu. Wstawić CS:0, jeśli nie można
+	uruchomić urządzenia.</LI>
+   <LI>ustawić odpowiedni status w nagłówku żądania</LI>
+  </OL>
+
+<BR></LI>
+
+
+
+
+
+
+
+
+ <LI><a name="sys_tut09" id="sys_tut09">Odczyt/Zapis (funkcje: 3, 4, 8, 9, 12, 16)</a>
+
+	<BR><a href="#sys_tut10" class="bezdruk">(przeskocz rozkazy odczytu i zapisu)</a>
+
+ <P>
+
+ES:BX wskazuje na strukturę zawierającą nagłówek żądania i dane. Ta struktura wygląda tak:</P>
+
+<TABLE summary="Tabela opisująca strukturę zawierającą nagłówek żądania">
+<caption>Nagłówek żądania</caption>
+<TR><TH style="width:10%;" id="odl2"> Odległość od początku </TH> <TH style="width:10%;" id="dl2"> Długość </TH>
+	 <TH id="cont2"> Zawartość </TH></TR>
+
+<TR><TD class="c" headers="odl2"> 0 </TD> <TD class="c" headers="dl2"> 13 bajtów</TD> <TD headers="cont2"> Nagłówek żądania</TD></TR>
+<TR><TD class="c" headers="odl2"> 0Dh </TD> <TD class="c" headers="dl2"> 1 </TD> <TD headers="cont2"> Bajt deskryptora nośnika z BPB
+		 (<span lang="en">Media Descriptor Byte</span>)</TD></TR>
+<TR><TD class="c" headers="odl2"> 0Eh </TD> <TD class="c" headers="dl2"> 4 </TD> <TD headers="cont2"> Offset i segment bufora, z którego dane będą odczytywane/
+			do którego dane będą zapisywane.</TD></TR>
+<TR><TD class="c" headers="odl2"> 12h </TD> <TD class="c" headers="dl2"> 2 </TD> <TD headers="cont2"> Liczba bajtów/sektorów do zapisania/odczytania.</TD></TR>
+<TR><TD class="c" headers="odl2"> 14h </TD> <TD class="c" headers="dl2"> 1 </TD> <TD headers="cont2"> Początkowy numer sektora (tylko urządzenia blokowe).
+			Nie ma znaczenia dla urządzeń znakowych.</TD></TR>
+<TR><TD class="c" headers="odl2"> 16h </TD> <TD class="c" headers="dl2"> 4 </TD> <TD headers="cont2"> Offset i segment identyfikatora napędu
+			(<span lang="en">volume ID</span>), gdy zwrócono kod błędu 0Fh.</TD></TR>
+</TABLE>
+
+<P>
+
+W czasie tej operacji należy:</P>
+  <OL>
+   <LI>ustawić odpowiedni status w nagłówku żądania</LI>
+   <LI>wykonać zadanie</LI>
+   <LI>ustawić rzeczywistą liczbę przeniesionych bajtów/sektorów</LI>
+  </OL>
+ <BR></LI>
+
+
+
+
+
+ <LI><a name="sys_tut10" id="sys_tut10"><span lang="en">NONDESTRUCTIVE INPUT NO WAIT</span></a>
+
+	<BR><a href="#sys_tut11" class="bezdruk">(przeskocz rozkaz <span lang="en">NONDESTRUCTIVE INPUT NO WAIT</span>)</a>
+
+ <P>
+
+Ten odczyt różni się od innych tym, że nie usuwa odczytanych danych z bufora.</P>
+<P>ES:BX wskazuje na strukturę zawierającą nagłówek żądania i dane. Ta struktura wygląda tak:</P>
+
+<TABLE summary="Tabela opisująca strukturę zawierającą nagłówek żądania">
+<caption>Nagłówek żądania</caption>
+<TR><TH style="width:10%;" id="odl3"> Odległość od początku </TH> <TH style="width:10%;" id="dl3"> Długość </TH>
+ <TH id="cont3"> Zawartość </TH></TR>
+
+<TR><TD class="c" headers="odl3"> 0 </TD> <TD class="c" headers="dl3"> 13 bajtów</TD> <TD headers="cont3"> Nagłówek żądania</TD></TR>
+<TR><TD class="c" headers="odl3"> 0Dh </TD> <TD class="c" headers="dl3"> 1 </TD> <TD headers="cont3"> Bajt odczytany z urządzenia</TD></TR>
+</TABLE>
+
+<P>
+
+W czasie tej operacji należy:</P>
+  <OL>
+   <LI>zwrócić bajt odczytany z urządzenia</LI>
+   <LI>ustawić odpowiedni status w nagłówku żądania</LI>
+  </OL>
+
+ <BR></LI>
+
+
+
+
+
+
+ <LI><a name="sys_tut11" id="sys_tut11"><span lang="en">INPUT FLUSH</span></a>
+
+	<BR><a href="#sys_tut12" class="bezdruk">(przeskocz rozkaz <span lang="en">INPUT FLUSH</span>)</a>
+
+ <P>
+Wymuszenie wykonania wszystkich operacji odczytu, o których wie sterownik.<BR>
+ES:BX wskazuje na nagłówek żądania.</P>
+
+<P>W czasie tej operacji należy:</P>
+  <OL>
+   <LI>ustawić odpowiedni status w nagłówku żądania</LI>
+  </OL>
+
+
+ <BR></LI>
+
+
+
+
+
+
+
+ <LI><a name="sys_tut12" id="sys_tut12"><span lang="en">OUTPUT FLUSH</span></a>
+
+	<BR><a href="#sys_tut08" class="bezdruk">(przeskocz rozkaz <span lang="en">OUTPUT FLUSH</span>)</a>
+
+ <P>
+Wymuszenie wykonania wszystkich operacji zapisu, o których wie sterownik.<BR>
+ES:BX wskazuje na nagłówek żądania.</P>
+
+<P>W czasie tej operacji należy:</P>
+  <OL>
+   <LI>ustawić odpowiedni status w nagłówku żądania</LI>
+  </OL>
+ </LI>
+</UL>
+
+
+
+
+
+
+
+
+<BR>
+
+<HR>
+<h2 class="nag"><a name="sys_tut08" id="sys_tut08">Przykład</a></h2>
+<P>
+Składając razem powyższe informacje, napisałem taki oto przykładowy plik .SYS.<BR>
+Jest to sterownik wymyślonego urządzenia znakowego <q>MYSZKA1</q>, który obsługuje tylko
+funkcję INIT (oczywiście) i <q>pobieranie danych</q> z urządzenia, które sprowadza się do
+zwrócenia starego znacznika EOF (1Ah).</P>
+<P>
+Aby było widać, że mój sterownik się ładuje (dzięki linii <span lang="en">DEVICE</span>=...
+w <span lang="en">config.sys</span>), dorobiłem kod wyświetlający na ekranie informację o ładowaniu.<BR>
+Resztę zobaczcie sami:</P>
+
+	<BR><a href="#sys_tut13" class="bezdruk">(przeskocz przykładowy kod)</a>
+<PRE title="przykładowy sterownik .sys">
+; Przykład sterownika typu .SYS
+; Autor: Bogdan D.
+; kontakt: bogdandr (małpka) op (kropka) pl
+;
+; kompilacja:
+; nasm -O999 -w+orphan-labels -o protosys.sys -f bin protosys.asm
+
+dd	0FFFFFFFFh		; wskaźnik na następny sterownik
+				; -1, bo mamy tylko 1 urządzenie
+dw	08000h			; atrybuty (urz. znakowe), output till busy (A000)
+dw	strategia		; adres procedury strategii
+dw	przerwanie		; adres procedury przerwania
+db	"MYSZKA1 "	; nazwa urządzenia (8 znaków, dopełniane spacjami)
+
+przerwanie:
+	pushf
+	push	es
+	push	bx
+	push	ax
+
+	les	bx, [cs:request_header]	; ES:BX wskazuje na nagłówek żądania
+	mov	al, [es:bx + 2]		; kod rozkazu
+
+	test	al, al			; 0 = INIT
+	jz	.init
+
+	cmp	al, 4			; czy ktoś chce czytać dane?
+	je	.czytanie
+
+	cmp	al, 5
+	je	.czytanie2
+
+					; innych żądań nie obsługujemy
+
+.koniec_przer:
+					; słowo wyniku w [es:bx+3]
+
+	mov	word [es:bx + 3], 100h	; mówimy, że wszystko zrobione
+
+	pop	ax
+	pop	bx
+	pop	es
+	popf
+
+	retf
+
+.init:
+				; podajemy adres końca kodu, który ma
+				; zostać w pamięci
+				; można usunąć niepotrzebny już kod
+	mov	word [es:bx + 0eh], koniec
+	mov	[es:bx + 10h], cs
+	pusha
+	push	es
+
+	mov	ah, 3			; pobranie aktualnej pozycji kursora
+	xor	bx, bx
+	int	10h			; DH, DL - wiersz, kolumna kursora
+
+	inc	dh
+	xor	dl, dl			; idziemy o 1 wiersz niżej,
+					; od lewej krawędzi
+	push	cs
+	mov	ax, 1301h		; AH=funkcja pisania na ekran.
+					; AL=przesuwaj kursor
+	mov	bx, 7			; normalne znaki (szary na czarnym)
+	mov	cx, init1_dl		; długość napisu
+	mov	bp, init1		; adres napisu
+	pop	es			; segment napisu = CS
+	int	10h			; napis na ekran.
+					; DH, DL wskazują pozycję.
+	pop	es
+	popa
+
+	jmp	short .koniec_przer
+
+.czytanie:			; jak ktoś chce czytać, zwracamy mu EOF
+	push	es
+	push	ax
+	push	cx
+	push	di
+
+	mov	cx, [es:bx + 12h]	; liczba żądanych bajtów
+	les	di, [es:bx + 0Eh]	; adres czytania/zapisywania
+	mov	al, 1Ah			; 1ah = EOF
+	rep	stosb			; zapisujemy
+
+	pop	di
+	pop	cx
+	pop	ax
+	pop	es
+	jmp	short .koniec_przer
+
+.czytanie2:			; jak ktoś chce czytać, zwracamy mu EOF
+	mov	byte [es:bx+0Dh], 1Ah
+	jmp	short .koniec_przer
+
+request_header	dd	0		; wskaźnik na nagłówek żądania
+
+strategia:
+
+	pushf
+	mov	[cs:request_header], bx	; zapisujemy adres nagłówka żądania
+	mov	[cs:request_header+2], es
+
+	cmp	byte [cs:pierwsze], 1
+	jne	.nie_pisz
+
+	mov	byte [cs:pierwsze], 0
+	pusha
+	push	es
+
+	mov	ah, 3			; pobranie aktualnej pozycji kursora
+	xor	bx, bx
+	int	10h			; DH, DL - wiersz, kolumna kursora
+
+	inc	dh
+	xor	dl, dl			; idziemy o 1 wiersz niżej,
+					; od lewej krawędzi
+
+	push	cs
+	mov	ax, 1301h		; AH=funkcja pisania na ekran.
+					; AL=przesuwaj kursor
+	mov	bx, 7			; normalne znaki (szary na czarnym)
+	mov	cx, info1_dl		; długość napisu
+	mov	bp, info1		; adres napisu
+	pop	es			; segment napisu = CS
+	int	10h			; napis na ekran.
+					; DH, DL wskazują pozycję.
+	pop	es
+	popa
+
+.nie_pisz:
+	popf
+	retf
+
+info1		db	"*** Uruchamianie sterownika MYSZKA1...",10,13,10,13
+info1_dl	equ	$ - info1
+init1		db	"*** INIT", 13, 10, 13, 10
+init1_dl	equ	$ - init1
+pierwsze	db	1
+
+; wszystko od tego miejsca zostanie wyrzucone z pamięci
+koniec:</PRE>
+
+
+
+<P><a name="sys_tut13" id="sys_tut13">Jak widać, było tu o wiele więcej</a>
+ opisu niż samej roboty i wcale nie okazało się to takie straszne.</P>
+<P>
+Aby zobaczyć, czy nasz sterownik rzeczywiście został załadowany i ile zajmuje miejsca w pamięci,
+należy wydać polecenie <code>mem /c/p</code>.
+</P>
+<P>Miłej zabawy.</P>
+
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

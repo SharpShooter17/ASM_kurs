@@ -1,0 +1,126 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Uruchamianie innych programów </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Uruchamianie innych programów">
+<META NAME="Keywords" CONTENT="asm, assembler, asembler, DOS, uruchamianie, int 21h 4B">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Uruchamianie innych programów</h1>
+<P>
+Czasem zdarza się, że z poziomu naszego własnego programu musimy uruchomić
+ jakiś inny program lub polecenie systemowe. Służy do tego funkcja systemowa
+ AH=4B przerwania <acronym lang="en" title="Disk Operating System">DOS</acronym>-a 21h.
+ Jej argumenty to kolejno:</P>
+<UL>
+ <LI>w AL - typ uruchomienia. Najczęściej AL=0, czyli załaduj i uruchom</LI>
+ <LI>w ES:BX - adres struktury dotyczącej środowiska uruchamianego programu. Pola struktury to kolejno:
+  <UL>
+   <LI>(WORD) segment zawierający zmienne środowiska. Można wpisać 0
+   	 	(wtedy będzie skopiowany nasz segment środowiska).</LI>
+   <LI>(DWORD) adres linii poleceń uruchamianego programu</LI>
+   <LI>(DWORD) adres pierwszego <span lang="en">File Control Block</span> (FCB)
+   		uruchamianego programu (nieużywane)</LI>
+   <LI>(DWORD) adres drugiego FCB uruchamianego programu (nieużywane)</LI>
+  </UL></LI>
+ <LI>w DS:DX - adres nazwy uruchamianego programu</LI>
+
+</UL>
+<P>Po więcej szczegółów odsyłam do
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html"
+ hreflang="en" tabindex="1">listy przerwań Ralfa <span lang="en">Brown</span>'a
+  (<acronym title="Ralf Brown's Interrupt List" lang="en">RBIL</acronym>)</A></P>
+<P>
+Spróbujmy teraz napisać jakiś prosty przykład - uruchomienie samego NASMa (powinien się
+ wyświetlić błąd, że nie podano plików wejściowych). Program jest w składni NASM.</P>
+
+	<BR><a href="#uruchtut01" class="bezdruk">(przeskocz przykładowy program)</a>
+
+<PRE title="przykład uruchomienia innego programu">
+; Program uruchamiający inny program.
+;
+; Autor: Bogdan D.
+; kontakt: bogdandr (at) op (dot) pl
+;
+; nasm -O999 -o exec_dos.com -f bin exec_dos.asm
+
+section	.text
+org	100h
+
+start:
+	mov	ax, cs
+	mov	es, ax		; będziemy zmieniać rozmiar segmentu kodu
+	mov	bx, koniec	; BX = rozmiar segmentu kodu
+	shr	bx, 4		; BX /= 16 - rozmiar w paragrafach
+	inc	bx		; żeby nie obciąć naszego programu
+	mov	ah, 4ah		; funkcja zmiany rozmiaru
+	int	21h
+				; zwolnienie miejsca na ładowany program
+
+	mov	[kom_ln+2], cs	; uzupełniamy pola potrzebnych struktur
+	mov	[fcb1+2], cs
+	mov	[fcb2+2], cs
+
+	mov	[sssp], sp	; zachowujemy nasz stos
+	mov	[sssp+2], ss
+
+	mov	ax, 4b00h	; funkcja uruchomienia programu
+	mov	dx, program	; adres nazwy programu
+	mov	bx, srod	; adres struktury środowiska
+	int	21h		; uruchamiamy
+
+	cli			; przywracamy nasz stos
+	mov	sp, [sssp]
+	mov	ss, [sssp+2]
+	sti
+
+
+	mov	ax, 4c00h
+	int	21h
+
+sssp 		dd	0	; miejsce na SS i SP
+
+; linia poleceń uruchamianego programu
+linia_kom	db	0, &quot;   &quot;, 0dh
+
+; File Control Block - juz nieużywana przez DOS
+; struktura, tu ustawiona na jakieś bezpieczne domyślne wartości
+; (zgodnie z książką Art of Assembler)
+fcb 		db	3,&quot; &quot;,0,0,0,0,0
+
+; nazwa programu do uruchomienia
+program 	db	&quot;nasm.exe&quot;, 0
+
+; struktura środowiska
+srod		dw	0		; segment środowiska. Nasz własny
+					; jest pod DS:[2ch]
+kom_ln		dw	linia_kom, 0	; offset i segment linii poleceń
+fcb1		dw	fcb, 0		; offset i segment pierwszego FCB
+fcb2		dw	fcb, 0		; offset i segment drugiego FCB
+
+koniec:</PRE>
+
+
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

@@ -1,0 +1,290 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Zarządzanie zasilaniem komputera </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Zarządzanie zasilaniem programami napisanymi w asemblerze">
+<META NAME="Keywords" CONTENT="Power Management, zarządzanie energią, assembler, asm, asembler, APM">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Zarządzanie zasilaniem komputera</h1>
+
+<P>
+Jeśli zastanawialiście się kiedyś, jak wyłączać dyski twarde lub resetować komputer
+używając tylko oprogramowania (nie naciskając żadnych przycisków), to w tym artykule
+powinniście znaleźć odpowiedź na wszystkie wasze pytania.
+</P>
+
+
+
+
+
+
+<BR><HR>
+<h2 class="nag">Wyłączanie monitora</h2>
+
+	<BR><a href="#hdd" tabindex="1" class="bezdruk">(przeskocz wyłączanie monitora)</a>
+<P>
+Zajmijmy się najpierw teorią. Przerwanie, którym najpierw się zajmiemy, to.... int 10h,
+przerwanie sterowników karty graficznej. Co one mają wspólnego z energią? Otóż, można z
+użyciem int 10h wyłączyć monitor. Zajrzyjmy do
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html"
+ hreflang="en"><acronym title="Ralf Brown's Interrupt List" lang="en">RBIL</acronym></A>, w opis
+funkcji numer 4F10h. Uruchomienie jej z BL=0 powinno nas upewnić, że odpowiednie funkcje
+są zainstalowane (zwróci AL=4Fh):</P>
+	<BR><a href="#pwr_tut01" class="bezdruk">(przeskocz sprawdzanie funkcji)</a>
+<PRE>
+	mov	ax, 4f10h
+	mov	bl, 0
+	xor	di, di
+	mov	es, di		; przerwanie żąda ES:DI = 0
+	int	10h
+
+	cmp	al, 4fh
+	jne	wychodzimy	; gdy klęska....</PRE>
+
+<P><a name="pwr_tut01" id="pwr_tut01">Teraz, jeśli wiemy, że ta funkcja działa</a>,
+ to patrzymy na kolejną. Wpisując 1 do BL możemy
+zmienić aktualny stan zasilania. W BH podajemy, co chcemy zrobić: 0-włączyć, 1-przełączyć w
+stan oczekiwania, 2-zawiesić, 4-wyłączyć monitor. Zanim jednak zaczniecie ochoczo pisać,
+dam wam radę: program należy napisać tak, aby po jakimś czasie monitor wracał jednak do
+stanu włączonego (bez resetowania komputera...). Wiem, że potrafilibyście coś takiego
+sami napisać, ale podam tutaj gotowe (i sprawdzone - działa nawet pod Win98) rozwiązanie:</P>
+	<BR><a href="#hdd" class="bezdruk">(przeskocz program wyłączający monitor)</a>
+<PRE>
+	; Program wyłącza monitor
+	;
+	; Autor: Bogdan D.
+	; kontakt: bogdandr (at) op (dot) pl
+	;
+	; nasm -O999 -o mon_off.com -f bin mon_off.asm
+
+	org 100h
+
+	start:
+		mov ax,4f10h		; wybranie numeru funkcji
+		mov bx,0401h		; BL=1 - zmień stan. BH=4 - wyłącz
+		int 10h
+
+		xor ah,ah
+		int 16h			; poczekaj na naciśnięcie klawisza
+
+		mov ax,4f10h
+		mov bx,1		; BL=1 - zmień stan. BH=0 - włącz
+		int 10h
+
+		mov ax,4c00h
+		int 21h</PRE>
+
+
+
+
+
+
+<BR>
+<HR>
+<h2 class="nag"><a name="hdd" id="hdd">Wyłączanie twardych dysków</a></h2>
+
+	<BR><a href="#pwr" class="bezdruk">(przeskocz wyłączanie twardych dysków)</a>
+<P>
+Z dyskami twardymi jest nieco gorzej. Tutaj trzeba się znać na kontrolerze
+ <acronym title="Hard Disk Drive" lang="en">HDD</acronym> - na jego
+portach i wysyłanych tam komendach. Dlatego posłużę się gotowcem. Ma on wyłączyć 2 pierwsze
+dyski twarde. Dla dokładniejszych opisów portów i ich komend spójrzcie
+do pliku <q>ports.lst</q> dołączonego do RBIL.
+ Gotowiec ten jest częścią doskonałego programu FDAPM
+(<span lang="en">FreeDOS Advanced Power Management</span>),
+ który wraz z kodem źródłowym można znaleźć na stronach
+<A HREF="http://www.freedos.org/" hreflang="en">projektu <span lang="en">FreeDOS</span></A>.</P>
+
+	<BR><a href="#pwr_tut02" class="bezdruk">(przeskocz program wyłączający dyski)</a>
+<PRE>
+	mov dx,1f6h     ; pierwszy kontroler IDE (drugi: 176)
+
+	mov al,0a0h     ; bez LBA, dysk nadrzędny (Master)
+        out dx,al
+        inc dx		; DX = 1F7
+        call miniWait	; chwila przerwy
+        mov al,0e0h	; e0 = standby, e1 = włączony/idle
+        out dx,al
+        dec dx		; DX = 1F6
+        call miniWait
+        mov al,0b0h     ; bez LBA, dysk podrzędny (Slave)
+        out dx,al
+        inc dx		; DX = 1F7
+        call miniWait
+        mov al,0e0h	; e0 = standby, e1 = włączony/idle
+        out dx,al
+
+	mov ax,4c00h
+	int 21h
+
+	miniWait:	; bardzo krótki okres przerwy
+	xchg ax, bx
+	xchg bx, ax
+	xchg ax, bx
+	xchg bx, ax
+	ret</PRE>
+
+<P><a name="pwr_tut02" id="pwr_tut02">Po zatrzymaniu twardego dysku</a> można go uruchomić
+ wykonując dowolną operację na systemie plików
+(na przykład wyświetlić zawartość bieżącego katalogu).
+</P>
+<P>
+Parkowanie głowic twardego dysku jest sprawą prostszą, gdyż w tym przypadku pomaga nam
+<acronym lang="en" title="Basic Input/Output System">BIOS</acronym>.
+Aby zaparkować głowice pierwszego dysku twardego, użyj następującego kodu:</P>
+<PRE>
+	mov	ah, 19h
+	mov	dl, 80h
+	int	13h
+
+	jc	blad		; nie pokazuje błędów pod Windows 98</PRE>
+
+<P>Jeśli chcecie zaparkować głowice drugiego dysku, zamiast 80h wpiszcie 81h, jeśli trzeciego - 82h
+itd.</P>
+
+
+
+
+
+
+
+
+
+<BR>
+<HR>
+<h2 class="nag"><a name="pwr" id="pwr">Resetowanie i wyłączanie komputera</a></h2>
+
+<P>
+Teraz ciekawsze sprawy - resetowanie komputera lub wyłączanie go. Na początek <q>grzecznie</q>
+posłużymy się przerwaniem - będzie to int15h, numery funkcji 5300h i 5307h (po szczegółowe
+opisy tych funkcji posyłam oczywiście do RBIL).
+Najpierw sprawdźmy w ogóle, czy <span lang="en">Advanced Power Management (APM)</span>
+ - bo o nim mowa - jest zainstalowane:</P>
+	<BR><a href="#pwr_tut03" class="bezdruk">(przeskocz sprawdzanie APM)</a>
+<PRE>
+	mov	ax, 5300h
+	xor	bx, bx		; numer urządzenia = 0 = BIOS
+	int	15h
+
+	jc	niestety   ; gdy coś poszło nie tak (na przykład brak APM), to CF=1</PRE>
+
+<P><a name="pwr_tut03" id="pwr_tut03">Teraz spróbujmy wyłączyć system</a>:</P>
+	<BR><a href="#pwr_tut04" class="bezdruk">(przeskocz wyłączanie zasilania)</a>
+<PRE>
+	mov	ax, 5307h	; funkcja APM
+	mov	cx, 3		; wyłącz system. CX=2 - zawieś system, CX=1 -
+				; przełącz system w stan oczekiwania stand-by
+	mov	bx, 1		; wszystkie urządzenia
+	int	15h		; spróbujemy wyłączyć...</PRE>
+
+<P><a name="pwr_tut04" id="pwr_tut04">Jeśli istnieje możliwość wyłączenia prądu w systemie</a>,
+ to powyższy kod powinien to załatwić.
+</P>
+<P>
+Teraz przejdziemy do innych <q>grzecznych</q> sposobów na zresetowanie komputera. W
+RBIL znalazłem:</P>
+	<BR><a href="#pwr_tut05" class="bezdruk">(przeskocz opis przerwań do resetowania)</a>
+<PRE lang="en" title="int 16h, ax=e0ffh; int 14h, ah=17h" >
+	INT 16 - AMI BIOS - BIOS-FLASH Interface - GENERATE CPU RESET
+	        AX = E0FFh
+
+	INT 14 - FOSSIL - REBOOT SYSTEM
+        AH = 17h
+        AL = method
+            00h = cold boot
+            01h = warm boot</PRE>
+
+<P><a name="pwr_tut05" id="pwr_tut05">Jak widać, nie wygląda to skomplikowanie.</a>
+ Niestety, żaden z powyższych sposobów nie działa u
+mnie pod <q>czystym</q> <acronym lang="en" title="Disk Operating System">DOS</acronym>-em,
+ a pod <span lang="en">Windows</span>98 działa jedynie sposób z APM (int15h).<BR>
+</P>
+<P>
+A teraz pokażę kilka <q>niegrzecznych</q> (ale za to sprawdzonych przeze mnie i działających bez
+pudła) sposobów na zresetowanie komputera.
+</P>
+<P>
+Pierwszym takim sposobem jest długi skok pod adres FFFF:0000 (tam znajduje się część BIOSu
+odpowiedzialna za operacje wykonywane przy starcie komputera). Wcześniej do segmentu danych
+BIOSu (segment 40h), pod adres 72h należy wpisać 0, gdy chcemy zimny reset (taki, co
+obejmuje testy pamięci i wszystko inne), a 1234h, gdy chcemy gorący reset.</P>
+<P>
+Odpowiednie kawałki kodu wyglądają tak (przypominam, że adres 0040h:0072h = 0000:0472h - patrz
+część 2 mojego kursu):</P>
+	<BR><a href="#pwr_tut06" class="bezdruk">(przeskocz kod do ręcznego resetowania)</a>
+<PRE>
+	; zimny reset:
+
+	mov	ax, 40h
+	mov	ds, ax			; DS = 40h
+	mov	word [ds:72h], 0	; zimny reset
+
+	; niektóre kompilatory (na przykład TASM) nie lubią instrukcji w stylu
+	; jmp 0FFFFh:0000h, więc zakoduję ją ręcznie
+	db	0eah		; kod instrukcji wzięty z podręczników Intela
+	dw	0		; offset
+	dw	0ffffh		; segment
+
+
+	; gorący reset:
+
+	xor	ax, ax
+	mov	ds, ax			; DS = 0
+	mov	word [ds:472h], 1234h	; gorący reset
+
+	db	0eah		; kod instrukcji wzięty z podręczników Intela
+	dw	0		; offset
+	dw	0ffffh		; segment</PRE>
+
+<P><a name="pwr_tut06" id="pwr_tut06">Drugim (i prostszym) sposobem</a>
+ jest zapisanie do jednego z portów klawiatury (64h)
+jednego z bajtów od F0 do FE, który ma bit0 = 0 (jest takich oczywiście kilka, najczęściej
+stosuje się FEh), chociaż ten sposób nie jest zalecany.<BR>
+Kod jest wyjątkowo prosty i wygląda tak:</P>
+<PRE>
+	mov	al, 0feh
+	out	64h, al</PRE>
+
+<P>
+Celowo nie wspominam tutaj o jednym: o przerwaniu int19h, które służy do ponownego przeczytania
+<span lang="en">boot</span>sektorów i przeładowania systemu od nowa.
+ Gdy wkładacie niesystemową dyskietkę do stacji
+i resetujecie komputer, to (o ile macie możliwość uruchomienia systemu z dyskietki) pojawia
+się napis informujący o nieprawidłowym dysku systemowym. Po naciśnięciu Entera uruchamiane
+jest właśnie int19h, które nie wykonuje żadnych resetów, tylko czyta
+ <span lang="en">boot</span>sektory od nowa.</P>
+<P>
+Nie wspominałem o int19h, gdyż jest ono niebezpieczne. Jeżeli jakikolwiek program przejął
+przerwanie na przykład zegara, to int19h nie przywróci poprzedniej procedury, co jest
+ <em class="wazne">nieprzewidywalne w skutkach</em>!
+</P>
+<HR>
+<P>Sposoby na wyłączanie urządzeń mogą się Wam przydać, gdy na przykład będziecie pisać własny wygaszacz
+ekranu, a możliwość zresetowania komputera przyda się, gdy Wasze oprogramowanie zostanie
+zainstalowane i musi zmienić na przykład zawartość pliku <q><span lang="en">autoexec</span>.bat</q>.<BR>
+Informacje, które tutaj podałem mogą się Wam też przydać przy pisaniu
+<span lang="en">boot</span>-sektorów do własnych <q>mini-systemów operacyjnych</q>.</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

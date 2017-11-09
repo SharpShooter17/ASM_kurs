@@ -1,0 +1,215 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Porty szeregowe i równoległe </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Porty szeregowe i równoległe">
+<META NAME="Keywords" CONTENT="asm, assembler, asembler, DOS, porty, szeregowe, równoległe, COM, LPT">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite/Kate; www.kate-editor.org">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Porty szeregowe i równoległe</h1>
+
+<P>
+Niektórym programom nie wystarcza działanie na samym procesorze czy sprzęcie
+znajdującym się w komputerze. Czasem trzeba połączyć się z jakimś urządzeniem
+zewnętrznym, takim jak modem zewnętrzny czy drukarka. Celem tego artykułu jest
+właśnie pokazanie, jak to zrobić. Przydatny będzie
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+>spis przerwań Ralfa <span lang="en">Brown</span>'a
+(<acronym lang="en" title="Ralf Brown's Interrupt List">RBIL</acronym>)</A></P>
+
+<P>
+Informacje tu zgromadzone pochodzą z książki <a href="http://webster.cs.ucr.edu" hreflang="en"
+lang="en">Art of Assembly</a> autorstwa Randalla Hyde'a i z informacji pochodzących z RBIL.
+Nie miałem możliwości ich zweryfikowania.</P>
+
+
+
+
+
+<hr>
+<h2 class="nag">Dostęp przez <acronym lang="en" title="Basic Input/Output System">BIOS</acronym></h2>
+	<BR><a href="#porty" class="bezdruk" tabindex="1">(przeskocz BIOS)</a>
+
+<P>
+BIOS oferuje nam dostęp tylko do portów szeregowych, za pośrednictwem przerwania int 14h.</P>
+<ol>
+ <li>AH=0 - inicjalizacja portu.<br>
+ 	<P>Rejestr AL ma zawierać parametry portu:</P>
+ 	<ul>
+ 	 <li>bity 5-7: szybkość, w bitach na sekundę: 000 - 110bps, 001 - 150bps, 010 - 300bps,
+ 	 	011 - 600bps, 100 - 1200bps, 101 - 2400bps, 110 - 4800bps, 111 - 9600bps.</li>
+ 	 <li>bity 3-4: tryb parzystości: 00 - brak, 01 - nieparzysta, 10 - brak, 11 - parzysta.</li>
+ 	 <li>bit 2: liczba bitów stopu: 0 - 1 bit stopu, 1 - 2 bity stopu.</li>
+ 	 <li>bity 0-1: bity danych: 10 - 7 bitów, 11 - 8 bitów danych</li>
+ 	</ul>
+ 	<P>Rejestr DX ma zawierać numer portu, od 0 dla COM1 do 3 dla COM4.<br>
+ 	Po wykonaniu tej operacji, w AX zwracany jest stan portu (patrz AH=3 poniżej).<br>
+ 	Przykład:</P>
+ 	<pre>
+		mov	ah, 0		; numer funkcji
+		mov	al, 11100011b	; 9600,8,N (brak parzystości),1
+		mov	dx, 0		; COM1
+		int	14h</pre>
+ 	</li>
+
+ <li>AH=1 - wyślij znak do portu.<br>
+ 	<P>DX ma zawierać numer portu, jak powyżej. AL ma zawierać wysyłany znak.<br>
+ 	Jeśli po wykonaniu tej operacji najstarszy bit AH jest jedynką, to wystąpił błąd.
+ 	<br>Przykład:</P>
+ 	<pre>
+		mov	ah, 1		; numer funkcji
+		mov	al, "a"		; znak do wysłania
+		mov	dx, 0		; COM1
+		int	14h</pre>
+ 	</li>
+
+ <li>AH=2 - odbierz znak z portu.<br>
+ 	<P>DX ma zawierać numer portu, jak powyżej.<br>
+ 	Po wykonaniu przerwania int 14h, AL będzie zawierać odebrany znak.<br>
+ 	Jeśli po wykonaniu tej operacji najstarszy bit AH jest jedynką, to wystąpił błąd.
+ 	<br>Przykład:</P>
+ 	<pre>
+		mov	ah, 2		; numer funkcji
+		mov	dx, 0		; COM1
+		int	14h		; znak w AL, jeśli nie ma błędu</pre>
+ 	</li>
+
+ <li>AH=3 - odczytaj stan portu portu.<br>
+ 	<P>DX ma zawierać numer portu, jak powyżej.<br>
+ 	Po wykonaniu przerwania int 14h, AX będzie zawierać stan portu. Znaczenie kolejnych
+ 	bitów przedstawia tabela:</P>
+
+	<table class="c" summary="Bity statusu portu">
+	<CAPTION>Bity statusu portu</CAPTION>
+	<TR class="c"> <TH id="numer"> numer </TH> <TH id="opis"> co znaczy </TH> </TR>
+
+	<TR class="c"> <TD headers="numer"> 15 </td> <TD headers="opis"> Przekroczenie czasu oczekiwania <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 14 </td> <TD headers="opis"> Rejestr przesunięcia transmisji (<span lang="en">Transmitter shift register</span>) pusty <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 13 </td> <TD headers="opis"> Rejestr przechowania transmisji (<span lang="en">Transmitter holding register</span>) pusty <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 12 </td> <TD headers="opis"> Błąd wykrywania przerwy <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 11 </td> <TD headers="opis"> Błąd ramki <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 10 </td> <TD headers="opis"> Błąd parzystości <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 9 </td> <TD headers="opis"> Błąd przepełnienia <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 8 </td> <TD headers="opis"> Dane są dostępne <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 7 </td> <TD headers="opis"> Wykryto sygnał linii odbiorczej <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 6 </td> <TD headers="opis"> Wskaźnik dzwonienia <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 5 </td> <TD headers="opis"> Dane są gotowe (DSR) <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 4 </td> <TD headers="opis"> Można wysyłać (CTS) <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 3 </td> <TD headers="opis"> Wykryto sygnał linii odbiorczej delta <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 2 </td> <TD headers="opis"> Wykryto dzwonek na krawędzi opadającej <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 1 </td> <TD headers="opis"> Dane delta są gotowe <br> </td> </TR>
+	<TR class="c"> <TD headers="numer"> 0 </td> <TD headers="opis"> Można wysyłać dane delta <br> </td> </TR>
+	</table>
+
+</ol>
+
+
+
+
+
+
+<hr>
+<h2 class="nag"><a name="porty" id="porty">Dostęp poprzez instrukcje IN i OUT</a></h2>
+	<BR><a href="#dos" class="bezdruk">(przeskocz dostęp przez porty)</a>
+
+<ol>
+<li>Porty szeregowe.<br>
+	<P>Dla portów szeregowych przeznaczone są porty sprzętowe: 03F8h-03FFh (COM1),
+	02E8h-02EFh (COM2), 02F8h-02FFh (COM3), 03E8h-03EFh (COM4).<br>
+	Pierwszy z każdej grupy portów (port bazowy) jest portem danych - na niego wysyła się bajty
+	do transmisji i z niego odczytuje się bajty odebrane przez port.<br>
+	Port baza+3 jest portem kontroli linii. Ustawia się w nim parametry portu:</P>
+	<ul>
+	 <li>bity 3-5 to kontrola parzystości: xx0 - brak, 001 - nieparzysta, 011 - parzysta,
+	 	101 - wysoka, 111 - niska, xx1 - programowa (x oznacza dowolną wartość).</li>
+	 <li>bit 2 określa liczbę bitów stopu: 0 - 1 bit stopu, 1 - 2 bity (jeśli bity danych
+	 	to 6, 7 lub 8) lub półtora bitu stopu (jeśli bitów danych jest 5).</li>
+	 <li>bity 0-1 mówią o ilości bitów danych: 00 - 5 bitów, 01 - 6 bitów, 10 - 7 bitów,
+	 	11 - 8 bitów</li>
+	</ul>
+	<P>Port baza+5 to port stanu linii (tylko do odczytu). Najważniejsze jego bity to:</P>
+	<ul>
+	 <li>bit 5 - jeśli równy 1, to kontroler może przyjąć kolejny znak do wysłania.</li>
+	 <li>bit 2 - błąd parzystości</li>
+	 <li>bit 1 - przepełnienie. Poprzedni znak w buforze został stracony.</li>
+	 <li>bit 0 - odebrano cały bajt i jest on gotowy do przeczytania.</li>
+	</ul>
+	<P>Przykład:</P>
+	<pre>
+			mov	dx, 3f8h + 5	; status COM1
+		spr_gotowy:
+			in	al, dx
+			test	al, 20h		; sprawdź bit 5
+			jz	spr_gotowy	; czekaj na gotowość
+			mov	dx, 3f8h	; bazowy port COM1
+			mov	al, 55h		; bajt do wysłania
+			out	dx, al		; wyślij bajt</pre>
+	</li>
+
+
+<li>Porty równoległe.<br>
+	<P>Dla portów równoległych przeznaczone są porty sprzętowe: 0278h-027Ah (LPT1),
+	0378h-037Ah (LPT2).<br>
+	Pierwszy z każdej grupy portów (port bazowy) jest portem danych - na niego wysyła się bajty
+	do transmisji i z niego odczytuje się bajty odebrane przez port (w przypadku portów
+	dwukierunkowych).<br>
+	Port baza+1 jest portem stanu. Jego najważniejsze bity to:</P>
+	<ul>
+	 <li>bit 7 - jeśli równy 1, to kontroler jest zajęty.</li>
+	 <li>bit 6 - brak potwierdzenia</li>
+	 <li>bit 5 - koniec papieru (drukarka)</li>
+	 <li>bit 3 - żaden błąd nie wystąpił</li>
+	</ul>
+	<P>Port baza+2 jest portem kontroli. Nie zawiera żadnych interesujących nas bitów.</P>
+	</li>
+</ol>
+
+
+
+
+
+
+
+<hr>
+<h2 class="nag"><a name="dos" id="dos">Dostęp przez
+	<acronym lang="en" title="Disk Operating System">DOS</acronym></a></h2>
+<P>
+W DOSie można oczywiście używać przedstawionych powyżej sposobów na dostęp do portów, ale jest
+też jeszcze jedna możliwość - zapis do plików specjalnych. DOS powinien utworzyć specjalne
+"urządzenia", których można używać tak samo jak plików, a same dane lądują nie w plikach,
+a w portach.</P>
+<P>
+ Te specjalne urządzenia mają nazwy "COM1", "COM2", "COM3", "COM4", "LPT1",
+"LPT2" (oczywiście nie wszystkie muszą być obecne na każdym systemie). Otwierając plik
+o nazwie "COM1" i zapisując do niego dane, tak naprawdę nie zapisujemy ich do żadnego
+pliku, a są one wysyłane do urządzenia przyłączonego do portu COM1. Dlatego czasem może
+być problem z utworzeniem realnego pliku o nazwie "COM1", a nawet jeśli da się go
+stworzyć, to zapisywane do niego dane mogą nie trafiać tam, gdzie byśmy tego
+oczekiwali.</P>
+<P>
+Tych urządzeń można używać jak normalnych plików, a to opisałem <a href="a_kurs11.htm"
+hreflang="pl">w swoim kursie</a>.</P>
+
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

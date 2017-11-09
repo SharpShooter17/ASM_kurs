@@ -1,0 +1,959 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS, część 2 - Pamięć </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Prev"     hreflang="pl" lang="en" href="a_kurs01.htm">
+<link rel="Next"     hreflang="pl" lang="en" href="a_kurs03.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author"      CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Kurs języka asembler">
+<META NAME="Language"    CONTENT="pl">
+<META NAME="Generator"   CONTENT="KWrite">
+<META NAME="Keywords"    CONTENT="kurs, asm, asembler, assembler, pamięć, RAM, zmienne, DOS, .com, .exe,
+	stos, przerwania, procedury, db, dw, dd, dp, df dq, dt, adresowanie, nasm, tasm, fasm,
+	segment, offset, tablice">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:47 GMT">
+</HEAD><BODY>
+
+<div class="c">Jak pisać programy w języku asembler?<BR>
+	<h1 class="nag">Część 2 - Pamięć, czyli gdzie upychać coś, co się nie mieści w procesorze</h1></div>
+<P>
+Poznaliśmy już rejestry procesora. Jak widać, jest ich ograniczona liczba i nie mają one
+zbyt dużego rozmiaru. Rejestry ogólnego przeznaczenia są co najwyżej 32-bitowe (czterobajtowe).
+Dlatego często programista musi niektóre zmienne umieszczać w pamięci. Przykładem tego był
+napis, który wyświetlaliśmy w poprzedniej części artykułu. Był on zadeklarowany dyrektywą DB,
+co oznacza <q lang="en">declare byte</q>. Ta dyrektywa niekoniecznie musi deklarować
+ dokładnie 1 bajt. Tak jak
+widzieliśmy, można nią deklarować napisy lub kilka bajtów pod rząd. Teraz omówimy rodzinę
+dyrektyw służących właśnie do rezerwowania pamięci.
+</P>
+<P>
+Ogólnie, zmienne można deklarować jako bajty (dyrektywą DB, coś jak
+&nbsp;<span lang="en">char</span>&nbsp; w języku C),
+ słowa (&nbsp;<span lang="en">word</span>&nbsp; = 16 bitów = 2 bajty, coś jak
+&nbsp; <span lang="en">short</span>&nbsp; w C) dyrektywą DW,
+ podwójne słowa DD (&nbsp;<span lang="en">double word = dword</span>&nbsp; = 32bity = 4 bajty, jak
+  &nbsp;<span lang="en">long</span>&nbsp; w C), potrójne słowa pword = 6 bajtów - PW,
+ poczwórne słowa DQ (&nbsp;<span lang="en">quad word = qword</span>&nbsp; = 8 bajtów, typ
+&nbsp;<span lang="en">long long</span>&nbsp;),
+  tbyte = 10 bajtów - DT (typ &nbsp;<span lang="en">long double</span>&nbsp; w C).
+</P>
+<P>
+ Przykłady (zakomentowane zduplikowane linijki są w składni TASMa):</P>
+	<BR><a href="#a_kurs0201" tabindex="1" class="bezdruk">(przeskocz przykłady)</a>
+
+	<PRE title="przykłady deklaracji zmiennych">
+	dwa		db 2
+	szesc_dwojek	db 2, 2, 2, 2, 2, 2 ; tablica sześciu bajtów
+	litera_g	db &quot;g&quot;
+	_ax		dw 4c00h	; dwubajtowa liczba całkowita
+	alfa		dd 12348765h	; czterobajtowa liczba całkowita
+
+	;liczba_a	dq 1125		; ośmiobajtowa liczba całkowita. NASM
+					; starszy niż wersja 2.00
+					; tego nie przyjmie, zamienimy to na
+					; postać równoważną:
+	liczba_a	dd 1125, 0	; 2 * 4 bajty
+
+	liczba_e	dq 2.71		; liczba zmiennoprzecinkowa
+					; podwójnej precyzji (double)
+
+	;duza_liczba  	dt 6af4aD8b4a43ac4d33h	; 10-bajtowa liczba całkowita.
+						; NASM/FASM tego nie przyjmie,
+						; zrobimy to tak:
+	duza_liczba	dd 43ac4d33h, 0f4aD8b4ah; czemu z zerem z przodu?
+						; Czytaj dalej
+			db 6ah
+
+	pi		dt 3.141592
+	;nie_init	db ?		; niezainicjalizowany bajt.
+					; Wartość nieznana.
+					; NASM tak tego nie przyjmie.
+					; Należy użyć:
+	nie_init	resb 1
+					; zaś dla FASMa:
+	;nie_init	rb 1
+
+	napis1		db &quot;NaPis1.&quot;
+	xxx		db 1
+			db 2
+			db 3
+			db 4	</PRE>
+
+<P><a name="a_kurs0201" id="a_kurs0201">Zwróćcie uwagę </a>
+na sposób rozbijania dużych liczb na poszczególne bajty: najpierw deklarowane
+są młodsze bajty, a potem starsze (na przykład <q>dd 11223344h</q> jest równoznaczne z
+ <q>db 44h, 33h, 22h, 11h</q>). To działa, gdyż procesory Intela i
+ <acronym title="Advanced Micro Devices" lang="en">AMD</acronym>
+  (i wszystkie inne klasy x86) są procesorami typu
+<q lang="en">little-endian</q>, co znaczy, że najmłodsze bajty danego ciągu bajtów są umieszczane przez
+procesor w najniższych adresach pamięci. Dlatego my też tak deklarujemy nasze zmienne.
+</P>
+<P>
+Ale z kolei takie coś:</P>
+	<PRE>	beta	db aah	</PRE>
+<P>nie podziała. Dlaczego? <em class="wazne">KAŻDA liczba musi zaczynać się od cyfry</em>.
+Jak to obejść? Tak:</P>
+	<PRE>	beta	db 0aah	</PRE>
+<P>czyli poprzedzić zerem.<BR>
+Nie podziała również to:</P>
+	<PRE>	0gamma	db 	9	</PRE>
+<P>Dlaczego? Etykiety (dotyczy to tak danych, jak i kodu programu)
+ <em class="wazne">nie mogą zaczynać się od cyfr</em>.</P>
+<p>
+Zapisanie kilku wartości po dyrektywie Dx (DB, DW, DD, i tak dalej) automatycznie
+tworzy tablicę elementów odpowiedniego rozmiaru o tych wartościach, z których każda następna
+jest tuż po poprzedniej w pamięci.
+Na przykład, następująca dyrektywa tworzy tak naprawdę tablicę sześciu bajtów o wartości 2, a nie
+próbuje z sześciu dwójek utworzyć wartość, którą potem umieści w pojedynczym bajcie:
+</p>
+<pre>
+	szesc_dwojek	db 2, 2, 2, 2, 2, 2</pre>
+<P>
+A co, jeśli chcemy zadeklarować zmienną, powiedzmy, składającą się z 234 bajtów równych zero?
+Trzeba je wszystkie napisać?
+<BR>
+Ależ skąd! Należy użyć operatora <q lang="en">duplicate</q>. Odpowiedź na pytanie brzmi (TASM):</P>
+<PRE title="deklaracja tablic w TASM">
+	zmienna		db	234	dup(0)
+	nazwa		typ	liczba       co zduplikować</PRE>
+
+<P>Lub, dla NASMa i FASMa:</P>
+<PRE title="deklaracja tablic w NASM i FASM">
+	zmienna:	TIMES	 234	db	0
+	nazwa			liczba   typ    co zduplikować</PRE>
+
+<P>A co, jeśli chcemy mieć dwuwymiarową tablicę podwójnych słów o wymiarach 25 na 34?<BR>
+Robimy tak (TASM):</P>
+
+<PRE>	Tablica		dd	25	dup (34 dup(?))</PRE>
+
+<P>Lub, dla NASMa i FASMa na przykład tak:</P>
+<PRE>	Tablica:	TIMES	 25*34	dd	0</PRE>
+
+<P>Do obsługi takich tablic przydadzą się bardziej skomplikowane sposoby adresowania zmiennych. O
+tym za moment.</P>
+<P>
+Zmiennych trzeba też umieć używać.<BR>
+Do uzyskania adresu danej zmiennej używa się operatora (słowa kluczowego) <q>offset</q> (TASM), tak
+jak widzieliśmy wcześniej. Zawartość zmiennej otrzymuje się poprzez umieszczenie jej w nawiasach
+kwadratowych. Oto przykład:</P>
+<PRE title="przykłady deklaracji i dostępu do zmiennych">
+	rejestr_ax	dw	4c00h
+	rejestr_bx	dw	?		; nie w NASMie/FASMie.
+						; użyć na przykład 0 zamiast &quot;?&quot;
+	rejestr_cl	db	?		; jak wyżej
+	...
+		mov	[rejestr_bx], bx
+		mov	cl, [rejestr_cl]
+		mov	ax, [rejestr_ax]
+		int	21h</PRE>
+
+<P>Zauważcie zgodność rozmiarów zmiennych i rejestrów.<BR>
+Możemy jednak mieć problem w skompilowaniu czegoś takiego:</P>
+<PRE>	mov	[jakas_zmienna], 2</PRE>
+<P>Dlaczego? Kompilator wie, że gdzieś zadeklarowaliśmy <q>jakas_zmienna</q>, ale nie wie, czy było to</P>
+<PRE>	jakas_zmienna	db	0</PRE>
+<P>czy</P>
+<PRE>	jakas_zmienna	dw	22</PRE>
+<P>czy może</P>
+<PRE>	jakas_zmienna	dd	&quot;g&quot;</PRE>
+<P>Chodzi o to, aby pokazać, jaki rozmiar ma obiekt docelowy. Nie będzie problemów, gdy napiszemy:</P>
+<PRE title="przykłady wpisywania liczb do zmiennych">
+	mov	word ptr [jakas_zmienna], 2	; TASM
+	mov	word [jakas_zmienna], 2		; NASM/FASM - bez PTR</PRE>
+
+<P>I to obojętnie, czy zmienna była bajtem (wtedy następny bajt będzie równy 0), czy słowem
+(wtedy będzie ono miało wartość 2) czy może podwójnym słowem lub czymś większym (wtedy 2
+pierwsze bajty zostaną zmienione, a pozostałe nie). Dzieje się tak dlatego, że zmienne zajmują
+kolejne bajty w pamięci, najmłodszy bajt w komórce o najmniejszym adresie. Na przykład:</P>
+<PRE>	xxx	dd	8</PRE>
+<P>jest równoważne:</P>
+<PRE>	xxx	db	8,0,0,0</PRE>
+<P>oraz:</P>
+<PRE>	xxx	db	8
+		db	0
+		db	0
+		db	0</PRE>
+
+<P>
+Te przykłady nie są jedynymi sposobami adresowania zmiennych (poprzez nazwę). Ogólny schemat
+wygląda tak:</P>
+<P>Używając rejestrów 16-bitowych:</P>
+
+    <span class="b" style="font-size: 200%;">[ (BX albo BP) lub (SI albo DI) lub liczba ]</span><br>
+
+
+<P>     słowo <q>albo</q> wyklucza wystąpienie obu rejestrów na raz
+<BR>   na przykład
+</P>
+<PRE title="16-bitowe sposoby adresowania">
+	mov	al, [ nazwa_zmiennej+2 ]
+	mov	[ di-23 ], cl
+	mov	al, [ bx + si + nazwa_zmiennej+18 ]</PRE>
+
+   <P>nazwa_zmiennej to też liczba, obliczana zazwyczaj przez linker.</P>
+<P>
+   W trybie rzeczywistym (na przykład pod DOSem) pamięć podzielona jest na segmenty, po 64kB
+ (65536 bajtów) każdy, przy czym
+   każdy kolejny segment zaczynał się 16 bajtów dalej niż wcześniejszy (nachodząc na niego).
+   Pamięć adresowalna wynosiła maksymalnie 65536 (maks. liczba segmentów) * 16 bajtów/segment
+   = 1MB. O tym limicie powiem jeszcze dalej.</P>
+	<BR><a href="#a_kurs0202" class="bezdruk">(przeskocz ilustrację ułożenia segmentów)</a>
+<PRE title="ułożenie segmentów względem siebie" class="asciiart">
+Ułożenie kolejnych segmentów względem siebie
+
+	segment o numerze 0
+0	+-----------------+
+	|		  |	segment o numerze 1
+10h	+-----------------+	+-----------------+
+	|		  |	|		  |	segment o numerze 2
+20h	+-----------------+	+-----------------+	+-----------------+
+	|		  |	|		  |	|		  |
+30h	+-----------------+	+-----------------+	+-----------------+
+	|		  |	|		  |	|		  |</PRE>
+
+<P>
+  <a name="a_kurs0202" id="a_kurs0202">Słowo <span lang="en">offset</span> oznacza odległość</a>
+    jakiegoś miejsca od początku segmentu. Adresy można było pisać w
+   postaci SEG:OFF. Adres liniowy (prawdziwy) otrzymywało się mnożąc segment przez 16 (liczba bajtów) i
+   dodając do otrzymanej wartości <span lang="en">offset</span>, na przykład adres segmentowy
+   1111h:2222h = adres bezwzględny 13332h (h = szesnastkowy).<BR>
+   Należy też dodać, że różne adresy postaci SEG:OFF mogą dawać w wyniku ten sam adres
+   rzeczywisty. Oto przykład: 0040h:0072h = (seg*16+off) 400h + 72h = 00472h = 0000h:0472h.
+</P>
+<P>
+   Na procesorach 32-bitowych (od 386) odnoszenie się do pamięci może (w kompilatorze TASM
+należy po dyrektywie <q>.code</q> dopisać linię niżej <q>.386</q>) odbywać się wg schematu:</P>
+
+    <span class="b" style="font-size: 200%;">zmienna [rej_baz + rej_ind * skala +- liczba]</span> (tylko TASM/MASM)<BR>
+      <P>lub</P>
+    <span class="b" style="font-size: 200%;">[    zmienna + rej_baz + rej_ind * skala +- liczba    ]</span>
+<P>
+   gdzie:</P>
+<UL>
+ <LI><q>zmienna</q> oznacza nazwę zmiennej i jest to liczba obliczana przez kompilator lub linker</LI>
+ <LI>rej_baz (rejestr bazowy) = jeden z rejestrów EAX, EBX, ECX, EDX, ESI,
+ 	EDI, EBP, ESP</LI>
+ <LI>rej_ind (rejestr indeksowy) = jeden z rejestrów EAX, EBX, ECX, EDX, ESI,
+ 	EDI, EBP (bez ESP)</LI>
+ <LI>mnożnik (scale) = 1, 2, 4 lub 8 (gdy nie jest podany, przyjmuje się 1)</LI>
+</UL>
+<P>Tak, tego schematu też <em class="wazne">można</em> używać w DOSie.<BR>
+<BR>
+Przykłady:</P>
+<PRE title="przykłady 32-bitowego adresowania">
+	mov	al, [ nazwa_zmiennej+2 ]
+	mov	[ edi-23 ], cl
+	mov	dl, [ ebx + esi*2 + nazwa_zmiennej+18 ]</PRE>
+
+<P>
+   Na procesorach 64-bitowych odnoszenie się do pamięci może (w kompilatorze TASM
+nie jest to obsługiwane) odbywać się wg schematu:</P>
+
+    <span class="b" style="font-size: 200%;">zmienna [rej_baz + rej_ind * skala +- liczba]</span> (tylko TASM/MASM)<BR>
+      <P>lub</P>
+    <span class="b" style="font-size: 200%;">[    zmienna + rej_baz + rej_ind * skala +- liczba    ]</span>
+<P>
+   gdzie:</P>
+<UL>
+ <LI><q>zmienna</q> oznacza nazwę zmiennej i jest to liczba obliczana przez kompilator lub linker</LI>
+ <LI>rej_baz (rejestr bazowy) = jeden z rejestrów RAX, RBX, RCX, RDX, RSI,
+ 	RDI, RBP, RSP, R8, ..., R15, a nawet RIP (ale wtedy nie można użyć żadnego
+	rejestru indeksowego)</LI>
+ <LI>rej_ind (rejestr indeksowy) = jeden z rejestrów RAX, RBX, RCX, RDX, RSI,
+ 	RDI, RBP, R8, ..., R15 (bez RSP i RIP)</LI>
+ <LI>mnożnik (scale) = 1, 2, 4 lub 8 (gdy nie jest podany, przyjmuje się 1)</LI>
+</UL>
+<P>Tak, tego schematu też <em class="wazne">można</em> używać w DOSie.<BR>
+<BR>
+Dwie zasady:</P>
+<ul>
+<li> między nawiasami kwadratowymi nie można mieszać rejestrów różnych rozmiarów</li>
+<li> w trybie 64-bitowym nie można do adresowania używać rejestrów cząstkowych: R*D, R*W, R*B.</li>
+</ul>
+<P>Przykłady:</P>
+<PRE title="przykłady 64-bitowego adresowania">
+	mov	al, [ nazwa_zmiennej+2 ]
+	mov	[ rdi-23 ], cl
+	mov	dl, [ rbx + rsi*2 + nazwa_zmiennej+18 ]
+	mov	rax, [rax+rbx*8-34]
+	mov	rax, [ebx]
+	mov	r8d, [ecx-11223344]
+	mov	cx, [r8]</PRE>
+
+
+
+<P>
+A teraz inny przykład: spróbujemy wczytać 5 elementów o numerach 1, 3, 78, 25, i 200 (pamiętajmy, że
+liczymy od zera) z tablicy <q>zmienna</q> (tej o 234 bajtach, zadeklarowanej wcześniej)
+do kilku rejestrów 8-bitowych. Operacja nie jest trudna i wygląda po prostu tak:</P>
+<PRE title="przykład dostępu do tablicy">
+	mov	al, [ zmienna + 1 ]
+	mov	ah, [ zmienna + 3 ]
+	mov	cl, [ zmienna + 78 ]
+	mov	ch, [ zmienna + 25 ]
+	mov	dl, [ zmienna + 200 ]</PRE>
+
+<P>Oczywiście, kompilator nie sprawdzi za Was, czy takie elementy tablicy rzeczywiście istnieją -
+o to musicie zadbać sami.</P>
+<P>
+W powyższym przykładzie rzuca się w oczy, że ciągle używamy słowa <q>zmienna</q>, bo wiemy, gdzie
+jest nasza tablica. Jeśli tego nie wiemy (dynamiczne przydzielanie pamięci), lub z
+innych przyczyn nie chcemy ciągle pisać <q>zmienna</q>, możemy posłużyć się bardziej złożonymi
+sposobami adresowania. Po chwili zastanowienia bez problemu stwierdzicie, że powyższy kod
+można bez problemu zastąpić czymś takim (i też będzie działać):</P>
+<PRE title="dostęp do tablicy z użyciem rejestru">
+	mov	bx, OFFSET zmienna	; w NASMie/FASMie: <q>mov bx, zmienna</q>
+	mov	al, [ bx + 1 ]
+	mov	ah, [ bx + 3 ]
+	mov	cl, [ bx + 78 ]
+	mov	ch, [ bx + 25 ]
+	mov	dl, [ bx + 200 ]</PRE>
+
+<P>Teraz trudniejszy przykład: spróbujmy dobrać się do kilku elementów dwuwymiarowej tablicy dwordów
+zadeklarowanej wcześniej (tej o rozmiarze 25 na 34). Mamy 25 wierszy po 34 elementy każdy.
+Aby do EAX wpisać pierwszy element pierwszego wiersza, piszemy oczywiście tylko:</P>
+<PRE>
+	mov	eax, [Tablica]</PRE>
+
+<P>Ale jak odczytać 23 element 17 wiersza? Otóż, sprawa nie jest taka trudna, jakby się mogło
+wydawać. Ogólny schemat wygląda tak (zakładam, że ostatni wskaźnik zmienia się najszybciej,
+potem przedostatni itd. - pamiętamy, że rozmiar elementu wynosi 4):</P>
+<PRE>
+	Tablica[17][23] = [ Tablica + (17*długość_wiersza + 23)*4 ]</PRE>
+
+<P>No więc piszemy (użyjemy tutaj wygodniejszego adresowania 32-bitowego):</P>
+
+<PRE title="dostęp do tablicy w pętli">
+		mov	ebx, OFFSET Tablica	; w NASMie/FASMie:
+						; mov ebx, Tablica
+		mov	esi, 17
+	jakas_petla:
+		imul	esi, 34		; ESI = ESI * 34 =
+					; 17 * długość wiersza
+		add	esi, 23		; ESI = ESI + 23 =
+					; 17 * długość wiersza + 23
+		mov	eax, [ ebx + esi*4 ]	; mnożymy numer elementu
+						; przez rozmiar elementu
+		...</PRE>
+
+<P>Można było to zrobić po prostu tak:</P>
+<PRE>	mov	eax, [ Tablica + (17*34 + 23)*4 ]</PRE>
+<P>ale poprzednie rozwiązanie (na rejestrach) jest wprost idealne do pętli, w której robimy coś
+z coraz to innym elementem tablicy.</P>
+<P>
+Podobnie (<q>(numer_wiersza*długość_wiersza1 + numer_wiersza*długość_wiersza2 + ...
+)*rozmiar_elementu</q>)
+adresuje się tablice wielowymiarowe. Schemat jest następujący:</P>
+<PRE title="adresowanie złożonych tablic">
+	Tablica[d1][d2][d3][d4]	  - 4 wymiary o długościach wierszy
+				    d1, d2, d3 i d4
+
+	Tablica[i][j][k][m] = [ Tablica + (i*d2*d3*d4+j*d3*d4+k*d4+m)*
+				*rozmiar elementu ]</PRE>
+
+<P>Teraz powiedzmy, że mamy taką tablicę:
+<PRE>	dword tab1[24][78][13][93]</PRE>
+<P>Aby dobrać się do elementu tab1[5][38][9][55], piszemy:</P>
+<PRE>	mov	eax, [ tab1 + (5*78*13*93 + 38*13*93 + 9*93 + 55)*4 ]</PRE>
+<P>
+Pytanie: do jakich segmentów odnosi się to całe adresowanie? Przecież mamy kilka rejestrów
+segmentowych, które mogą wskazywać na zupełnie co innego.<BR>
+Odpowiedź:<BR>
+Na rejestrach 16-bitowych obowiązują reguły:</P>
+<UL>
+ <LI>jeśli pierwszym rejestrem jest BP, używany jest SS</LI>
+ <LI>w pozostałych przypadkach używany jest DS</LI>
+</UL>
+<P>Na rejestrach 32-bitowych mamy:</P>
+<UL>
+ <LI>jeśli pierwszym w kolejności rejestrem jest EBP lub ESP, używany jest SS</LI>
+ <LI>w pozostałych przypadkach używany jest DS</LI>
+</UL>
+<P>W systemach 64-bitowych segmenty odchodzą w zapomnienie.
+<br>
+Domyślne ustawianie można zawsze obejść używając przedrostków, na przykład</P>
+<PRE title="użycie segmentów innych niż domyślne">
+	; TASM:
+		mov	ax, ss:[si]
+		mov	gs:[eax+ebx*2-8], cx
+
+	; NASM/FASM:
+		mov	ax, [ss:si]
+		mov	[gs:eax+ebx*2-8], cx
+</PRE>
+
+<BR><BR><BR>
+
+
+
+
+<HR>
+<h2 class="nag">Organizacja pamięci w komputerze</h2>
+<P>
+Po załadowaniu systemu <acronym lang="en" title="Disk Operating System">DOS</acronym>,
+ pamięć wygląda z grubsza tak (niektóre elementy zostaną zaraz opisane) :</P>
+
+	<BR><a href="#a_kurs0203" class="bezdruk">(przeskocz ilustrację pamięci w DOSie)</a>
+<PRE title="pamięć w systemie DOS" class="asciiart">
+	FFFFF	+-----------------------------------------------+
+		|	Pamięć urządzeń, HMA, UMB, część BIOSu	|
+	BFFFF	+-----------------------------------------------+
+		|	Pamięć karty graficznej			|
+	A0000	+-----------------------------------------------+
+		|						|
+		..		...				..
+		..		...				..
+		|	Uruchamiane programy			|
+		+-----------------------------------------------+
+		|						|
+		..		...				..
+		..		...				..
+		|	DOS - jego kod, dane i stos		|
+	~500h	+-----------------------------------------------+
+		|	BIOS Data Area (segment 40h)		|
+	400h	+-----------------------------------------------+
+		|	Tablica wektorów przerwań		|
+	0	+-----------------------------------------------+</PRE>
+
+<P><a name="a_kurs0203" id="a_kurs0203">Od segmentu A0000</a>
+ zaczyna się pamięć karty graficznej. Pamięć ta jest bezpośrednim odwzorowaniem ekranu
+ i pisząc tam, zmieniamy zawartość ekranu (więcej o tym w innych artykułach). Po przeliczeniu A0000 na
+ system dziesiętny dostajemy 655360, czyli ... 640<abbr title="kilobajt">kB</abbr>.
+  Stąd wziął się ten sławny limit pamięci konwencjonalnej.</P>
+<P>Powyżej znajduje się DOSowy <span lang="en">Upper Memory Block</span>
+ i <span lang="en">High Memory Area</span>. Na samym końcu granic adresowania
+ (czyli tuż pod 1<abbr title="megabajt">MB</abbr>) jest jeszcze skrawek BIOSu
+  i to miejsce (a właściwie to adres FFFF:0000) jest
+ punktem startu procesora tuż po włączeniu zasilania. W okolicach tego adresu znajduje się
+ instrukcja skoku, która mówi procesorowi, gdzie są dalsze instrukcje.<br>
+ Od adresu zero zaczyna się Tablica Wektorów Przerwań (<span lang="en">Interrupt Vector Table</span>,
+ IVT), mająca 256 adresów procedur obsługi przerwań po 4 bajty (segment+offset) każdy.<br>
+ Potem jest <span lang="en">BIOS Data Area</span> (segment 40h), powyżej - kod DOSa, a
+ po nim miejsce na uruchamiane programy.
+ </P>
+
+<P>Ale chwileczkę! DOS nie może korzystać z więcej niż 1 MB pamięci? A co z
+<acronym title="Expanded Memory Specification" lang="en">EMS</acronym> i
+<acronym title="Extended Memory Specification" lang="en">XMS</acronym>?<BR>
+ Megabajt pamięci to wszystko, co może osiągnąć procesor 16-bitowy. Procesory od 80386 w górę są
+ co najmniej 32-bitowe, co daje łączną możliwość zaadresowania 2^32 = 4<abbr title="gigabajt">GB</abbr>
+  pamięci, o ile tylko jest tyle zainstalowane.<BR>
+ Menadżery EMS i XMS są to programy (napisane dla procesorów 32-bitowych), które umożliwiają innym
+ programom dostęp do pamięci powyżej 1 MB. Sam DOS nie musi mieć aż tyle pamięci, ale inne
+ programy mogą korzystać z dobrodziejstw większych ilości pamięci
+ <acronym lang="en" title="Random Access Memory">RAM</acronym>. Zamiast korzystać z przerwania DOSa
+ do rezerwacji pamięci, programy te korzystają z interfejsu udostępnianego przez na przykład HIMEM.SYS czy
+ EMM386.EXE i udokumentowanego w
+ <A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html" hreflang="en"
+ 	>spisie przerwań Ralfa <span lang="en">Brown</span>'a</A>.
+<br>
+O tym, jak korzystać z pamięci EMS i XMS, możecie przeczytać też w moim
+<a href="emsxms.htm" hreflang="pl">mini-kursie o pamięci EMS i XMS</a>.
+</P>
+<P>
+Struktura pamięci dla poszczególnych programów zależy od ich typu. Jak pamiętamy z części pierwszej, program
+ typu .com mieści się w jednym segmencie, wykonywanie zaczyna się od adresu 100h (256. bajt), a wcześniej
+ jest między innymi linia poleceń programu.<BR>
+Wygląda to tak:</P>
+	<BR><a href="#a_kurs0204" class="bezdruk">(przeskocz ilustrację pamięci programu COM)</a>
+<PRE title="układ programu .com" class="asciiart">
+			+-----------------------+
+			|	CS:FFFF		|	- tu zaczyna się stos
+			|   Stos, zm. lokalne	|
+			|   argumenty funkcji	|
+			|			|
+			+-	 .....	       -+
+			|			|
+			+-	 .....	       -+
+			|			|
+			+-	 .....	       -+
+			| CS:100h początek kodu	|
+			+-----------------------+
+			|			|
+	CS=DS=ES=SS	+-----------------------+</PRE>
+
+<P><a name="a_kurs0204" id="a_kurs0204">Kod zaczyna się od CS:100h</a>, wszystkie rejestry
+segmentowe mają równe wartości. Od CS:FFFF zaczyna się stos rosnący oczywiście w dół, więc
+pisząc taki program trzeba uważać, by ze stosem nie wejść na kod lub dane.
+</P>
+<P>
+ Programy .exe mają
+ nieco bardziej złożoną strukturę. Kod zaczyna się pod adresem 0 w danym, wyznaczonym
+ przez DOS, segmencie. Ale rejestry DS i ES mają inną wartość niż CS i wskazują na wspomniane przy
+ okazji programów .com 256 bajtów zawierających linię poleceń programu itp. Dane programu, jeśli
+ zostały umieszczone w kodzie w osobnym segmencie, też mogą dostać własny segment pamięci.
+ Segment stosu zaś jest całkowicie oddzielony od pozostałych, zwykle za kodem.
+ Jego położenie zależy od rozmiaru kodu i danych. Jako że programy .exe posiadają nagłówek,
+ DOS nie musi przydzielać im całego segmentu. Zamiast tego,
+ rozmiar segmentu kodu (i stosu) odczyta sobie z nagłówka pliku.<BR>
+Graficznie wygląda to tak:</P>
+
+	<BR><a href="#a_kurs0205" class="bezdruk">(przeskocz ilustrację pamięci programu EXE)</a>
+<PRE title="układ programu .exe" class="asciiart">
+			+-----------------------+
+			|   Stos, zm. lokalne	|
+			|   argumenty funkcji	|
+	SS		+-----------------------+
+
+			+-----------------------+
+			|  Dane, zm. globalne	|
+			|      (statyczne)	|
+			+-----------------------+
+
+			+-----------------------+
+			|	CS:xxxx		|
+			+-	 .....	       -+
+			|			|
+			+-	 .....	       -+
+			|			|
+			+-	 .....	       -+
+			|			|
+			+-	 .....	       -+
+			|   CS:0 początek kodu	|
+	CS		+-----------------------+
+
+			+-----------------------+
+			|			|
+	DS=ES		+-----------------------+</PRE>
+
+
+
+
+
+
+<BR><BR><HR>
+<h2 class="nag"><a name="a_kurs0205" id="a_kurs0205">Stos</a></h2>
+<P>
+Przyszła pora na omówienie, czym jest stos.<BR>
+Otóż, stos jest po prostu kolejnym segmentem pamięci.
+ Są na nim umieszczane dane tymczasowe, na przykład
+<em class="wazne">adres powrotny z funkcji, jej parametry wywołania, jej zmienne lokalne</em>.
+Służy też do zachowywania zawartości rejestrów.<BR>
+Obsługa stosu jest jednak zupełnie inna.<BR>
+Po pierwsze, stos jest <q>budowany</q> od góry na dół! Rysunek będzie pomocny:
+</P>
+	<BR><a href="#a_kurs0206" class="bezdruk">(przeskocz rysunek stosu)</a>
+<PRE title="rysunek stosu" class="asciiart">
+
+	Adres
+			SS
+		+-------------------+
+	100h	|		    |
+		+-------------------+	&lt;----- SP = 100h
+	0FEh	|		    |
+		+-------------------+
+	0FCh	|		    |
+		+-------------------+
+	0FAh	|		    |
+		+-------------------+
+	0F8h	|		    |
+		+-------------------+
+	0F6h	|		    |
+	...		....</PRE>
+
+<P><a name="a_kurs0206" id="a_kurs0206">Na tym rysunku</a>
+ SP=100h, czyli SP wskazuje na komórkę o adresie 100h w segmencie SS.<BR>
+Dane na stosie umieszcza się instrukcją <code><span lang="en">PUSH</span></code>
+a zdejmuje instrukcją <code>POP</code>.
+ <code><span lang="en">PUSH</span></code> jest równoważne parze pseudo-instrukcji:</P>
+<PRE>
+	sub	sp, ..	; rozmiar zależy od rozmiaru obiektu w bajtach
+	mov	ss:[sp], ..</PRE>
+
+<P>a <code>POP</code>:</P>
+<PRE>
+	mov	.., ss:[sp]
+	add	sp, ..</PRE>
+
+<P>Tak więc, po wykonaniu instrukcji <code><span lang="en">PUSH</span> AX</code>
+i <code><span lang="en">PUSH</span> DX</code> powyższy stos będzie wyglądał tak:</P>
+	<BR><a href="#a_kurs0207" class="bezdruk">(przeskocz rysunek działania stosu)</a>
+<PRE title="operacje na stosie: PUSH" class="asciiart">
+	Stos po wykonaniu PUSH AX i PUSH DX, czyli
+		sub	sp, 2
+		mov	ss:[sp], ax
+		sub	sp, 2
+		mov	ss:[sp], dx
+
+			SS
+		+-------------------+
+	100h	|		    |
+		+-------------------+
+	0FEh	|	AX	    |
+		+-------------------+
+	0FCh	|	DX	    |
+		+-------------------+	&lt;----- SP = 0FCh
+	...		....</PRE>
+
+<P><a name="a_kurs0207" id="a_kurs0207">SP=0FCh, pod [SP] znajduje się wartość DX</a>, a pod
+[SP+2] - wartość AX. A po wykonaniu instrukcji <code>POP EBX</code> (tak, można zdjąć
+dane do innego rejestru, niż ten, z którego pochodziły):</P>
+	<BR><a href="#a_kurs0208" class="bezdruk">(przeskocz drugi rysunek działania stosu)</a>
+<PRE title="operacje na stosie: POP" class="asciiart">
+	Stos po wykonaniu POP EBX, czyli
+		mov	ebx, ss:[sp]
+		add	sp, 4
+
+			SS
+		+-------------------+
+	100h	|		    |
+		+-------------------+	&lt;----- SP = 100h
+	0FEh	|	AX	    |
+		+-------------------+
+	0FCh	|	DX	    |
+		+-------------------+
+	...		....</PRE>
+
+<P><a name="a_kurs0208" id="a_kurs0208">Teraz ponownie SP=100h</a>.
+Zauważcie, że dane są tylko kopiowane ze stosu, a nie z niego usuwane. Ale w żadnym przypadku nie
+można na nich już polegać. Dlaczego? Zobaczycie zaraz.<BR>
+Najpierw bardzo ważna uwaga, która jest wnioskiem z powyższych rysunków.<BR>
+Dane (które chcemy z powrotem odzyskać w niezmienionej postaci) położone na stosie instrukcją
+<code><span lang="en">PUSH</span></code> należy zdejmować kolejnymi instrukcjami <code>POP</code>
+ <em class="wazne">W ODWROTNEJ KOLEJNOŚCI</em> niż były kładzione. Zrobienie czegoś takiego:</P>
+<PRE>
+	push	ax
+	push	dx
+	pop	ax
+	pop	dx
+</PRE>
+<P><em class="wazne">nie przywróci rejestrom ich dawnych wartości!</em></P>
+
+
+
+
+
+
+
+<BR><BR>
+<HR>
+<h2 class="nag">Przerwania i procedury a stos</h2>
+<P>
+Używaliśmy już instrukcji przerwania, czyli <code>INT</code>. Przy okazji omawiania stosu nadeszła pora, aby
+powiedzieć, co ta instrukcja w ogóle robi. Otóż, <code>INT</code> jest równoważne temu pseudo-kodowi:</P>
+<!-- 	<BR><a href="#a_kurs0208_1" class="bezdruk">(przeskocz działanie INT)</a> -->
+<PRE title="działanie instrukcji INT">
+	pushf			; włóż na stos rejestr stanu procesora (flagi)
+	push	cs		; segment, w którym aktualnie pracujemy
+	push	ip_next		; adres instrukcji po INT
+	jmp	procedura_obslugi_przerwania</PRE>
+
+<P><a name="a_kurs0208_1" id="a_kurs0208_1">Każda procedura obsługi przerwania</a>
+(<span lang="en">Interrupt Service Routine</span>, ISR) kończy się instrukcją <code>IRET</code>
+ (<span lang="en">interrupt return</span>), która odwraca powyższy kod, czyli z
+ISR procesor wraca do dalszej obsługi naszego programu.</P>
+<P>
+Jednak oprócz instrukcji <code>INT</code> przerwania mogą być wywołane w inny sposób - przez sprzęt. Tutaj
+właśnie pojawiają się <acronym lang="en" title="Interrupt Request">IRQ</acronym>.
+ Do urządzeń wywołujących przerwania IRQ należą między innymi  karta dźwiękowa,
+modem, zegar, kontroler dysku twardego, itd...</P>
+<P>
+Bardzo istotną rolę gra zegar, utrzymujący aktualny czas w systemie. Jak napisałem w jednym z
+artykułów, tyka on z częstotliwością ok. 18,2 Hz. Czyli ok. 18 razy na sekundę wykonywane są 3
+<code><span lang="en">PUSH</span></code>e a po nich 3 <code>POP</code>y. Nie zapominajmy o
+<code>PUSH</code> i <code>POP</code> wykonywanych w samej ISR tylko po to, aby zachować modyfikowane
+rejestry. Każdy <code><span lang="en">PUSH</span></code> zmieni to, co jest poniżej SP.</P>
+
+<P><em class="wazne">Dlatego właśnie żadne dane poniżej SP nie mogą być uznawane za wiarygodne.</em></P>
+<P>
+Gdzie zaś znajdują się procedury obsługi przerwań?<BR>
+W pamięci, pod adresami od 0000:0000 do 0000:03ff włącznie znajdują się czterobajtowe adresy (pary
+CS oraz IP) odpowiednich procedur. Jest ich 256.<BR>
+Pierwszy adres jest pod 0000:0000 - wskazuje on na procedurę obsługi przerwania int 0<BR>
+Drugi    adres jest pod 0000:0004 - int 1<BR>
+Trzeci   adres jest pod 0000:0008 - int 2<BR>
+Czwarty  adres jest pod 0000:000c - int 3<BR>
+...<BR>
+255-ty   adres jest pod 0000:03fc - int 0FFh<BR>
+W taki właśnie sposób działa mechanizm przerwań w DOSie.
+</P>
+<P>
+Mniej skomplikowana jest instrukcja <code><span lang="en">CALL</span></code>,
+ która służy do wywoływania zwykłych procedur, na przykład:</p>
+<pre>
+	call proc1		; wywołanie proste
+	call [adres_proc1]	; wywołanie procedury, której adres
+				; jest w zmiennej adres_proc1
+	...
+proc1:
+	...
+	ret</pre>
+<p> W
+zależności od rodzaju procedury (<span lang="en">near</span> - zwykle w tym samym pliku/programie,
+ far - na przykład w innym pliku/segmencie), instrukcja <code><span lang="en">CALL</span></code>
+ wykonuje takie coś:</P>
+<!-- 	<BR><a href="#a_kurs0208_2" class="bezdruk">(przeskocz działanie CALL)</a> -->
+<PRE title="działanie instrukcji CALL">
+	push	cs		; tylko jeśli FAR
+	push	ip_next		; adres instrukcji po CALL</PRE>
+
+<P><a name="a_kurs0208_2" id="a_kurs0208_2">Procedura może zawierać dowolne </a>
+(nawet różne ilości instrukcji <code><span lang="en">PUSH</span></code> i <code>POP</code>), ale
+pod koniec SP musi być taki sam, jak był na początku, czyli wskazywać na prawidłowy adres powrotu,
+który ze stosu jest zdejmowany instrukcją <code>RET</code> (lub <code>RETF</code>). Dlatego
+nieprawidłowe jest takie coś:</P>
+<!-- 	<BR><a href="#a_kurs0209" class="bezdruk">(przeskocz przykład złej procedury)</a> -->
+<PRE title="nieprawidłowa procedura">
+	zla_procedura:
+		push	ax
+		push	bx
+		add	ax, bx
+		ret</PRE>
+
+<P><a name="a_kurs0209" id="a_kurs0209">gdyż w chwili wykonania </a>
+instrukcji <code>RET</code> na wierzchu stosu jest BX, a nie adres powrotny! Błąd
+stosu jest przyczyną wielu trudnych do znalezienia usterek w programie.
+<BR> Jak to poprawić bez zmiany sensu? Na przykład tak:</P>
+<!-- 	<BR><a href="#a_kurs0210" class="bezdruk">(przeskocz przykład dobrej procedury)</a> -->
+<PRE title="prawidłowa procedura">
+	dobra_procedura:
+		push	ax
+		push	bx
+		add	ax, bx
+		add	sp, 4
+		ret</PRE>
+	<a name="a_kurs0210" id="a_kurs0210"></a>
+
+<P>Teraz już wszystko powinno być dobrze. SP wskazuje na dobry adres powrotny. Dopuszczalne jest
+też takie coś:</P>
+	<BR><a href="#a_kurs0211" class="bezdruk">(przeskocz przykład innej dobrej procedury)</a>
+<PRE title="kolejna prawidłowa procedura">
+	; TASM:
+	proc1	proc	near
+		push	ax
+		cmp	ax, 0		; czy AX jest zerem?
+		je	koniec1		; jeśli tak, to koniec1
+
+		pop	bx
+		ret
+	koniec1:
+		pop	cx
+		ret
+	proc1	endp</PRE>
+
+
+<BR><a href="#a_kurs0212" name="a_kurs0211" id="a_kurs0211" class="bezdruk">(przeskocz ten sam przykład w wersji NASM i FASM)</a>
+
+<PRE title="kolejna prawidłowa procedura w wersji NASM/FASM">
+	; NASM/FASM:
+	proc1:				; bez PROC i NEAR
+		push	ax
+		cmp	ax, 0		; czy AX jest zerem?
+		je	koniec1		; jeśli tak, to koniec1
+
+		pop	bx
+		ret
+	koniec1:
+		pop	cx
+		ret
+	; bez ENDP</PRE>
+
+<P><a name="a_kurs0212" id="a_kurs0212">SP ciągle jest dobrze ustawiony</a>
+ przy wyjściu z procedury mimo, iż jest 1 <code><span lang="en">PUSH</span></code> a 2 <code>POP</code>y.<BR>
+Po prostu <em class="wazne">ZAWSZE</em> należy robić tak, aby SP wskazywał na poprawny
+adres powrotny, niezależnie od sposobu.
+W skład tego wchodzi definiowanie procedur pod głównym programem (po ostatnich instrukcjach
+zamykających program).
+Dlaczego? Niektóre (najprostsze)
+formaty plików wykonywalnych nie pozwalają na określenie początku programu i takie programy
+są wykonywane po prostu z góry na dół. Jeśli u góry kodu umieści się procedury, zostaną one wykonane,
+po czym instrukcja <code>RET</code> (lub <code>RETF</code>) spowoduje zamknięcie programu
+(w najlepszym przypadku) lub wejście procesora na nieprawidłowe lub losowe instrukcje w pamięci.
+</P>
+
+
+
+
+
+
+<hr>
+<h2 class="nag">Alokacja zmiennych lokalnych procedury</h2>
+<P>
+Nie musi się to Wam od razu przydać, ale przy okazji stosu omówię, gdzie znajdują się
+ zmienne lokalne funkcji (na przykład takich w języku C) oraz jak rezerwować na nie miejsce.</P>
+<P>
+Gdy program wykonuje instrukcję <code><span lang="en">CALL</span></code>, na stosie umieszczany jest adres
+ powrotny (o czym już wspomniałem). Jako że nad nim mogą być jakieś dane ważne dla programu
+ (na przykład zachowane rejestry, inne adresy powrotne),
+ nie wolno tam nic zapisywać. Ale pod adresem powrotnym jest dużo miejsca i to tam właśnie
+ programy umieszczają swoje zmienne lokalne.</P>
+<P>Samo rezerwowanie miejsca jest dość proste: liczymy, ile łącznie bajtów nam potrzeba na
+ własne zmienne i tyle właśnie odejmujemy od rejestru SP, robiąc tym samym miejsce na stosie, które
+ nie będzie zamazane przez instrukcje <code>INT</code> i <code><span lang="en">CALL</span></code>
+(gdyż one zamazują tylko to, co jest pod SP).</P>
+<P>
+Na przykład, jeśli nasze zmienne zajmują 8 bajtów (np.dwa DWORDy lub dwie 32-bitowe zmienne
+ typu "int" w języku C), to odejmujemy te 8 od SP i nasz nowy stos wygląda tak:</P>
+
+<pre title="rezerwacja miejsca na zmienne lokalne" class="asciiart">
+			SS
+		+-------------------+
+	100h	|  adres powrotny   |
+		+-------------------+	&lt;----- stary SP = 100h
+	0FEh	|	wolne	    |
+		+-------------------+
+	0FCh	|	wolne	    |
+		+-------------------+
+	0FAh	|	wolne	    |
+		+-------------------+
+	0F8h	|	wolne	    |
+		+-------------------+	&lt;----- SP = 0F8h</pre>
+
+<P>SP wynosi 0F8h, nad nim jest 8 bajtów wolnego miejsca, po czym adres powrotny i inne stare dane.3
+</p>
+<p>
+Nie trzeba podawać typów zmiennych lokalnych, ich liczby ani ich nazywać - wystarczy obliczyć ich
+łączny rozmiar i ten rozmiar odjąć od SP. To, gdzie która zmienna faktycznie w pamięci się
+znajdzie (lub inaczej: który obszar pamięci będzie przypisany której zmiennej), zależy
+całkowicie od programisty - na przykład [SP] może przechowywać pierwszą zmienną, a [SP+4]
+- drugą, ale może być też całkiem na odwrót.</P>
+<P>
+Miejsce już mamy, korzystanie z niego jest proste - wystarczy odwoływać się do
+ [SP], [SP+2], [SP+4], [SP+6]. Ale stanowi to pewien problem, bo po każdym wykonaniu
+ instrukcji <code><span lang="en">PUSH</span></code> lub <code><span lang="en">POP</span></code>,
+ te cyferki się zmieniają (bo przecież adresy się
+ nie zmieniają, ale SP się zmienia). Dlatego właśnie do adresowania zmiennych lokalnych
+ często używa się innego rejestru niż SP. Jako że domyślnym segmentem dla BP
+ jest segment stosu, wybór padł właśnie na ten rejestr (oczywiście, można używać
+ dowolnego innego, tylko trzeba dostawiać SS: z przodu, co kosztuje za każdym razem 1 bajt).</P>
+<P>
+Aby móc najłatwiej dostać się do swoich zmiennych lokalnych, większość funkcji na początku
+ zrównuje BP z SP, potem wykonuje rezerwację miejsca na zmienne lokalne, a dopiero potem
+ - zachowywanie rejestrów itp. (czyli swoje <code><span lang="en">PUSH</span></code>e). Wygląda to tak:</P>
+<pre>
+	push	bp		; zachowanie starego BP
+	mov	bp, sp		; BP = SP
+
+	sub	sp, xxx		; rezerwacja miejsca na zmienne lokalne
+	push	rej1		; tu SP się zmienia, ale BP już nie
+	push	rej2
+	...
+
+	...
+	pop	rej2		; tu SP znów się zmienia, a BP - nie
+	pop	rej1
+
+	mov	sp, bp		; zwalnianie zmiennych lokalnych
+				;   można też (ADD SP,xxx)
+	pop	bp
+
+	ret</pre>
+<p>
+Niektóre kompilatory umożliwiają deklarację procedury z parametrami, zmiennymi lokalnymi i ich typami:
+</p>
+<pre>
+	proc2 proc a:DWORD,b:DWORD
+		LOCAL c:DWORD
+		LOCAL d:DWORD
+		LOCAL e:DWORD
+		...
+		ret
+	proc2 endp</pre>
+<p>
+Można wtedy odwoływać się do parametrów i zmiennych lokalnych przez ich nazwy, zamiast przez wyrażenia
+typu [SP+nnn] i [SP-nnn].
+</p>
+<P>Przy instrukcji <code>MOV SP, BP</code> napisałem, że zwalnia ona zmienne lokalne.
+ Zmienne te oczywiście dalej są na stosie, ale teraz są już poniżej SP, a niedawno
+ napisałem: <em class="wazne">żadne dane poniżej SP nie mogą być uznawane za wiarygodne.</em></P>
+<P>
+Po pięciu pierwszych instrukcjach nasz stos wygląda tak:</P>
+<pre title="BP i SP po prologu" class="asciiart">
+			   SS
+		+-----------------------+
+		|    adres powrotny	|
+		+-----------------------+
+		|       stary BP	|
+		+-----------------------+	&lt;----- BP
+		|      xxx bajtów	|
+		|			|
+		|			|
+		+-----------------------+
+		|  	  rej1		|
+		+-----------------------+
+		|	  rej2		|
+		+-----------------------+	&lt;----- SP</pre>
+
+<P>Rejestr BP wskazuje na starą wartość BP, zaś SP - na ostatni element włożony na stos.<br>
+I widać teraz, że zamiast odwoływać się do zmiennych lokalnych poprzez <code>[SP+liczba]</code> przy ciągle
+ zmieniającym się SP, o wiele wygodniej odwoływać się do nich przez <code>[BP-liczba]</code>
+ (zauważcie: minus), bo BP pozostaje niezmienione.</P>
+<P>
+Często na przykład w disasemblowanych programach widać instrukcje typu <code><span lang="en">AND</span> SP, NOT 16</code>
+ (lub <code> <span lang="en">AND</span> SP, ~16</code> w składni NASM). Jedynym celem takich instrukcji jest
+ wyrównanie SP do pewnej pożądanej granicy, na przykład 16 bajtów (wtedy <code><span lang="en">AND</span></code>
+ z wartością NOT 16, czyli FFFFFFF0h), żeby dostęp do zmiennych lokalnych trwał krócej.
+ Gdy adres
+ zmiennej na przykład czterobajtowej jest nieparzysty, to potrzeba dwóch dostępów do pamięci, żeby ją całą
+ pobrać (bo można pobrać 32 bity z na raz w procesorze 32-bitowym i tylko z adresu podzielnego przez 4).
+</P>
+<P>
+Ogół danych: adres powrotny, parametry funkcji, zmienne lokalne i zachowane rejestry nazywany jest
+ czasem <span class="b">ramką stosu</span> (ang. <span lang="en">stack frame</span>).<br>
+  Rejestr BP jest czasem nazywany wskaźnikiem ramki, gdyż umożliwia od dostęp do
+  wszystkich istotnych danych poprzez
+ stałe przesunięcia (offsety, czyli te liczby dodawane i odejmowane od BP): zmienne
+ lokalne są pod <code>[BP-liczba]</code>, parametry funkcji przekazane z zewnątrz -
+ pod <code>[BP+liczba]</code>, zaś pod <code>[BP]</code> jest stara wartość BP. Jeśli wszystkie
+ funkcje w programie zaczynają się tym samym prologiem: <code>PUSH BP / MOV BP, SP</code>, to
+ po wykonaniu instrukcji <code>MOV BP, [BP]</code> w BP znajdzie się wskaźnik ramki ...
+ procedury wywołującej. Jeśli znamy jej strukturę, można w ten sposób dostać się do jej
+ zmiennych lokalnych.</P>
+
+<Hr>
+<P>
+Zainteresowanych szczegółami adresowania lub instrukcjami odsyłam do
+<A class="intel_link" href="http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html" hreflang="en">Intela</A>
+lub
+<A class="amd_link" href="http://developer.amd.com/Resources/documentation/guides/Pages/default.aspx" hreflang="en">AMD</A></P>
+<P>
+Następnym razem o podstawowych instrukcjach języka asembler.</P>
+
+<blockquote>- Ilu programistów potrzeba, aby wymienić żarówkę?<BR>
+- Ani jednego. To wygląda na problem sprzętowy.</blockquote>
+
+<br><br>
+<div class="bezdruk">
+<a accesskey="3" hreflang="pl" href="a_kurs01.htm">Poprzednia część kursu</a> (Alt+3)<BR>
+<a accesskey="4" hreflang="pl" href="a_kurs03.htm">Kolejna część kursu</a> (Alt+4)<br>
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+<BR><HR>
+<h2 class="nag">Ćwiczenia</h2>
+<OL class="dec">
+ <LI>Zadeklaruj tablicę 12 zmiennych mających po 10 bajtów:
+  <OL class="alfa">
+   <LI>zainicjalizowaną na zera (pamiętaj o ograniczeniach kompilatora)</LI>
+   <LI>niezainicjalizowaną</LI>
+  </OL>
+ <BR></LI>
+
+ <LI>Zadeklaruj tablicę 12 słów (16-bitowych) o wartości BB (szesnastkowo), po czym do
+	każdego z tych słów wpisz wartość FF szesnastkowo (bez żadnych pętli).
+	Można (a nawet trzeba) użyć więcej niż 1 instrukcji.
+	 Pamiętaj o odległościach między
+	poszczególnymi elementami tablicy. Naucz się różnych sposobów adresowania: liczba
+	(nazwa zmiennej + numer), baza (rejestr bazowy + liczba), baza + indeks (rejestr
+	bazowy + rejestr indeksowy).<BR><BR></LI>
+
+ <LI>Zadeklaruj dwuwymiarową tablicę bajtów o wartości 0 o wymiarach 13 wierszy na 5 kolumn,
+	 po czym do elementu numer 3 (przedostatni) w wierszu o numerze 12 (ostatni) wpisz
+	 wartość FF. Spróbuj użyć różnych sposobów adresowania.
+	</LI>
+</OL>
+
+</BODY></HTML>

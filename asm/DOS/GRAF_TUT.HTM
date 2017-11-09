@@ -1,0 +1,276 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS: Tryb graficzny </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Tryb graficzny w języku asembler">
+<META NAME="Keywords" CONTENT="Ekran, pamięć, A000, grafika, asm, assembler, asembler">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:49 GMT">
+</HEAD><BODY>
+
+<h1 class="nag">Tryb graficzny w języku asembler</h1>
+
+
+<P>
+Na początek uprzedzam: jeśli myślicie o wysokich rozdzielczościach, to się zawiedziecie, gdyż ten
+kurs nie będzie takich omawiał. Jeśli naprawdę wolicie wysokie rozdzielczości, to
+poszukajcie w Internecie opisu standardu <span lang="en">VESA</span> lub
+ <span lang="en">DirectX</span>
+ <acronym title="Application Programming Interface" lang="en">API</acronym>.
+</P>
+<P>
+A my, zamiast bawić się w te wszystkie skomplikowane sprawy, zajmiemy się trybem 13h.
+Ten tryb oferuje rozdzielczość 320x200 w 256 kolorach (co widać też w
+<A HREF="http://www-2.cs.cmu.edu/afs/cs.cmu.edu/user/ralf/pub/WWW/files.html"
+ hreflang="en">Liście Przerwań Ralfa <span lang="en">Brown</span>'a</A> -
+ <acronym title="Ralf Brown's Interrupt List" lang="en">RBIL</acronym>).<BR>
+Ale najważniejszą jego cechą jest to, że 320x200 = 64000 &lt; 64kB, więc cały ekran mieści się w
+jednym segmencie, co znacznie ułatwia pracę.</P>
+<P>
+Ekran w trybie graficznym mieści się w segmencie 0A000h oraz:<BR>
+0A000:0000 - pierwszy piksel (bajt, 256 możliwości)<BR>
+0A000:0001 - drugi piksel<BR>
+0A000:0002 - trzeci piksel<BR>
+...
+</P>
+<P>
+Do zmiany trybu graficznego używa się przerwania 10h, funkcji 0 (opis wyjęty z Listy przerwań
+Ralfa <span lang="en">Brown</span>'a):</P>
+	<BR><a href="#graf_tut01" tabindex="1" class="bezdruk">(przeskocz opis int 10h, ah=0)</a>
+<PRE title="int 10h, ah=0" lang="en">
+	INT 10 - VIDEO - SET VIDEO MODE
+	        AH = 00h
+	        AL = desired video mode (see #00010)
+	Return: AL = video mode flag (Phoenix, AMI BIOS)
+	            20h mode > 7
+	            30h modes 0-5 and 7
+	            3Fh mode 6
+	        AL = CRT controller mode byte (Phoenix 386 BIOS v1.10)
+	Desc:   specify the display mode for the currently active display
+		 adapter</PRE>
+
+<P><a name="graf_tut01" id="graf_tut01">Jak widać, zmiana trybu graficznego</a>
+	 na omawiany tryb 13h nie jest trudniejsza niż:</P>
+<PRE>
+	mov ax, 13h
+	int 10h</PRE>
+
+<P>Powrót do tradycyjnego trybu tekstowego 80x25 wygląda tak:</P>
+<PRE>
+	mov ax, 3
+	int 10h</PRE>
+
+<P>Pytanie brzmi: jak cokolwiek narysować?<BR>
+Nic prostszego! Po prostu pod adres:<BR>
+wiersz*320 + kolumna<BR>
+zapisujemy odpowiedni bajt, na przykład tak (składnia TASM):</P>
+<PRE title="zapalenie piksela na ekranie">
+	mov ax, 0a000h
+	mov es, ax
+	xor di,di
+	mov byte ptr es:[di],15		; NASM/FASM:   mov byte [es:di],15</PRE>
+
+<P>No ale 1 piksel to za mało na nasze ambicje, prawda?<BR>
+Spróbujmy narysować poziomą linię (NASM):</P>
+	<BR><a href="#graf_tut02" class="bezdruk">(przeskocz program rysujący linię poziomą)</a>
+<PRE title="program rysujący linię poziomą">
+	; nasm -O999 -o liniapoz.com -f bin liniapoz.asm
+
+	org 100h
+
+		mov ax, 13h
+		int 10h			; uruchom tryb graficzny 13h
+
+		mov ax, 0a000h
+		mov es, ax
+		xor di, di
+
+		mov al, 15
+		mov cx, 10
+
+		rep stosb		; przenieś 10 bajtów wartości 15 pod
+					; es:di = 0a000:0000
+
+		xor ah, ah
+		int 16h
+
+		mov ax, 3
+		int 10h			; powrót do trybu tekstowego
+
+		mov ax, 4c00h
+		int 21h</PRE>
+
+<P><a name="graf_tut02" id="graf_tut02">To chyba nie było zbyt trudne</a>, prawda?
+No to spróbujmy coś trudniejszego: linia pionowa.</P>
+<P>
+Cała <q>filozofia</q> w tym przypadku polega na tym, aby po
+narysowaniu piksela przejść o 1 wiersz niżej (czyli o 320 bajtów dalej). Piszmy więc (NASM):</P>
+	<BR><a href="#graf_tut03" class="bezdruk">(przeskocz program rysujący linię pionową)</a>
+<PRE title="program rysujący linię pionową">
+	; nasm -O999 -o liniapio.com -f bin liniapio.asm
+
+	org 100h
+
+		mov	ax, 13h
+		int	10h
+
+		mov	ax, 0a000h
+		mov	es, ax
+		xor	di, di
+
+		mov	al, 15
+		mov	cx, 100
+
+	rysuj:
+		mov	[es:di], al
+		add	di, 320
+		loop	rysuj
+
+		xor	ah, ah
+		int	16h
+
+		mov	ax, 3
+		int	10h
+
+		mov	ax, 4c00h
+		int	21h</PRE>
+
+<P><a name="graf_tut03" id="graf_tut03">Na razie było łatwo</a>:
+ rysować zaczynaliśmy w lewym górny rogu, więc DI był równy 0. A co, jeśli
+chcemy wyświetlać piksele gdzieś indziej?<BR>
+Cóż, są dwie możliwości:</P>
+<OL>
+ <LI>W czasie pisania programu (czyli przed kompilacją) znasz dokładną pozycję, gdzie będziesz
+	rysować.
+	<P> W takim przypadku kompilator policzy DI za ciebie, wystarczy wpisać coś takiego:</P>
+	<PRE>		mov di, wiersz*320 + kolumna	</PRE>
+	<P>wstawiając w miejsce słów <q>wiersz</q> i <q>kolumna</q> znane przez siebie wartości.</P>
+	</LI>
+ <LI>Pozycja, gdzie będziesz rysować jest zmienna i zależy na przykład od tego, co wpisze użytkownik.
+	<P>Tutaj jest gorzej. Trzeba wpisać do programu instrukcje, które przemnożą wiersz
+	przez 320 i dodadzą kolumnę. Należy raczej unikać powolnej
+	instrukcji (I)MUL. Ten problem rozwiążemy tak (wiersz i kolumna to 2 zmienne po 16
+	bitów):</P>
+	<PRE title="obliczanie pozycji bez użycia (I)MUL">
+		mov ax, [wiersz]
+		mov bx, [wiersz]	; BX = AX
+		shl ax, 8		; AX = AX*256
+		shl bx, 6		; BX = BX*64 = AX*64
+		add ax, bx		; AX = AX*256 + AX*64 = AX*320 =
+					;     = wiersz*320
+		add ax, [kolumna]	; AX = wiersz*320 + kolumna
+
+		mov di,ax	</PRE></LI>
+</OL>
+<P>
+Ostatni przykład: rysowanie okręgu (no, w każdym razie czegoś co miało być okręgiem a ma
+kształt bardziej przypominający elipsę...).
+Program ten wykorzystuje koprocesor do policzenia sinusów i kosinusów dla kątów od 0 do 360
+stopni, przerobionych na radiany. Komentarze obok instrukcji FPU oznaczają stan stosu, od
+st(0) z lewej.</P>
+
+	<BR><a href="#graf_tut04" class="bezdruk">(przeskocz program rysujący koło)</a>
+<PRE title="program rysujący koło">
+	; nasm -O999 -o kolo.com -f bin kolo.asm
+
+	org 100h
+
+		mov ax, 13h
+		int 10h
+
+		mov ax, 0a000h
+		mov es, ax
+
+		mov cx, 360
+
+		finit
+		fldpi
+		fild word [sto80]
+
+		fdivp st1, st0		; pi/180
+
+		fld1
+		fild word [r]		; r, 1, pi/180
+		fldz			; kąt=0, r, 1, pi/180
+
+		mov al, 15
+
+	rysuj:
+		fld st0			; kąt, kąt, r, 1, pi/180
+
+		fmul st4		; kąt w radianach
+		mov di, 100*320 + 160	; środek ekranu
+
+		fsin			; sin(kąt), kąt, r, 1, pi/180
+		fmul st2		; sin(kąt)*r, kąt, r, 1, pi/180
+
+		fistp word [wys]	; kąt, r, 1, pi/180
+
+		fld st0			; kąt, kąt, r, 1, pi/180
+		fmul st4		; kąt w radianach
+		fcos			; cos(kąt), kąt, r, 1, pi/180
+		fmul st2		; r*cos(kąt), kąt, r, 1, pi/180
+
+		fistp word [szer]	; kąt, r, 1, pi/180
+
+		add di, [szer]		; dodajemy odległość poziomą
+
+		mov dx, [wys]
+		mov bx, dx
+		shl dx, 8
+		shl bx, 6
+		add dx, bx		; dx = wys*320
+
+		sub di, dx		; odejmujemy odległość pionową
+
+		mov [es:di], al		; wyświetlamy piksel
+
+		fadd st0, st2		; kat += 1
+
+		dec cx
+		jnz rysuj
+
+		finit
+
+		xor ah, ah
+		int 16h
+
+		mov ax, 3
+		int 10h
+
+		mov ax, 4c00h
+		int 21h
+
+	r	dw	50
+	szer	dw	0
+	wys	dw	0
+	sto80	dw	180</PRE>
+
+<P><a name="graf_tut04" id="graf_tut04">Podobnie, używając FSIN i FCOS</a>,
+ można rysować na przykład linie ukośne, które pominąłem w tym kursie.
+</P>
+<P>
+Mam nadzieję, że po lekturze tego odcinka każdy bez problemów będzie rysował w tym dość prostym
+(zwłaszcza do nauki) trybie graficznym.</P>
+<P>Miłego eksperymentowania!</P>
+
+<br><br>
+<div class="bezdruk">
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+</BODY></HTML>

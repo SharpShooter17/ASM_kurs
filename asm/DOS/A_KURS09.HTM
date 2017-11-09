@@ -1,0 +1,412 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<HTML lang="pl">
+<HEAD>
+<META HTTP-EQUIV="Content-Type"       CONTENT="text/html; charset=ISO-8859-2">
+<META HTTP-EQUIV="Content-Language"   CONTENT="pl">
+<META http-equiv="Content-Style-Type" content="text/css">
+<META HTTP-EQUIV="X-Frame-Options"    CONTENT="DENY">
+<LINK rel="stylesheet" href="../asm.css" type="text/css">
+
+<TITLE> Asembler: DOS, część 9 - Narzędzia </TITLE>
+<link rel="Start"    hreflang="pl" lang="en" href="../index.htm">
+<link rel="Prev"     hreflang="pl" lang="en" href="a_kurs08.htm">
+<link rel="Next"     hreflang="pl" lang="en" href="a_kurs10.htm">
+<link rel="Contents" hreflang="pl" lang="en" href="../index.htm">
+
+<META NAME="Author" CONTENT="Bogdan D.">
+<META NAME="Description" CONTENT="Kurs języka asembler">
+<META NAME="Keywords" CONTENT="kurs, asm, asembler, assembler, debugger, debug,
+	Turbo Debugger, CodeView, TRW, Insight, GoBug, OllyDbg, IDE, make">
+<META NAME="Language" CONTENT="pl">
+<META NAME="Generator" CONTENT="KWrite">
+<meta http-equiv="Last-Modified" content="Sun, Jul 10 2016 10:55:48 GMT">
+</HEAD><BODY>
+
+<div class="c">Jak pisać programy w języku asembler?<BR>
+	<h1 class="nag">Część 9 - Narzędzia programisty, czyli co może
+	 nam pomagać w programowaniu</h1></div>
+
+<BR>
+<HR>
+<h2 class="nag">Debugery</h2>
+
+	<BR><a href="#ide" tabindex="1" class="bezdruk">(przeskocz debugery)</a>
+<P>
+
+Wszystkim się może zdarzyć, że nieustanne, wielogodzinne gapienie się w kod programu nic nie
+daje i program ciągle nie chce nam działać. Wtedy z pomocą przychodzą debugery. W tej części
+zaprezentuję kilka wartych uwagi programów tego typu. Nie będę szczegółowo mówił, jak ich używać, bo
+zwykle posiadają albo menu, albo dokumentację czy inną pomoc.
+</P>
+<P>
+<em class="wazne">UWAGA:</em> Niektóre debugery mogą wpływać na wartości widziane w rejestrach. Może
+się tak stać na przykład wtedy, gdy przerwanie, które wywołujemy, jest wewnętrznie wykorzystywane przez debuger.
+W szczególności, może to mieć miejsce w przypadku <span class="b">Turbo Debuggera</span>
+i funkcji <code>3Fh</code> i <code>40h</code> przerwania
+<acronym lang="en" title="Disk Operating System">DOS</acronym>-a (<code>int 21h</code>).
+</P>
+
+<P>Debuggery programów DOS-owych:</P>
+	<BR><a href="#a_kurs0901" class="bezdruk">(przeskocz DOSowe debugery)</a>
+<OL>
+ <LI><span lang="en">Watcom Debugger</span> (WD).
+	<P>Rozpowszechniany z pakietem <a href="http://www.openwatcom.org" hreflang="en" lang="en"
+	>OpenWatcom</a>, WD jest najlepszym z darmowych debugerów. Umożliwia wyświetlanie rejestrów
+	procesora, flag, koprocesora, <acronym title="MultiMedia Extension" lang="en">MMX</acronym>
+	i <acronym title="Streaming SIMD Extension" lang="en">SSE</acronym>,
+	śledzenie wartosci zmiennych, stawianie
+	pułapek (<span lang="en">breakpoint</span>, klawisz F9), podgląd wyjścia programu
+	(klawisz F4), wykonywanie do kursora i wiele innych działań. Posiada obsługę myszy.
+	Pozwala debugować wszystko, co może być wytworzone przez pakiet
+	<span lang="en">OpenWatcom</span> - .com, .exe (MZ i LE) i wiele innych.
+ 	</P></li>
+
+ <LI><span lang="en">Turbo Debugger</span> (TD) firmy Borland.
+	<P>Jeden z najlepszych dostępnych. Niestety, nie darmowy.
+	Umożliwia wyświetlanie rejestrów 16/32-bit, rejestrów
+	koprocesora, stosu i pewnych regionów pamięci (standardowo DS:0000) oraz flag i
+	daje możliwość modyfikacji ich wszystkich. Można obserwować zmienne oraz to, co się
+	dzieje na ekranie poza debuggerem.
+	Gdy testowałem program działający w trybie graficznym, to po każdej komendzie monitor
+	przełączał się w ten tryb, po czym wracał do debuggera, co umożliwia podglądanie
+	naprawdę każdego kroku. Niestety, zrobienie czegokolwiek poza przejściem do kolejnej
+	instrukcji wymagało przejścia w tryb pełnego ekranu, gdyż okienko w
+	<span lang="en">Windows</span> nie za bardzo było potem odświeżane...<BR>
+	Niestety, TD nie ma on pojęcia o technologiach takich, jak
+	MMX czy SSE (jest po prostu za stary).
+	Posiada wiele opcji debugowania: <span lang="en">trace-over, step-into, execute-to,
+	 animate</span>, ...<BR>
+	Nadaje się do plików .com/.exe (najnowsza wersja 5.5 obsługuje tylko pliki 32-bitowe).
+	Można go ściągnąć ze stron Borlanda po zarejestrowaniu się.
+	</P></LI>
+
+ <LI>D86.
+	<P>Darmowy obsługuje tylko procesory 16-bitowe (brak rozszerzonych rejestrów), ale można
+	podglądać rejestry, flagi, pamięć i koprocesor. D86 jest rozprowadzany razem z A86,
+	darmowym kompilatorem języka asembler, i rozpoznaje symbole (nazwy zmiennych itp.),
+	które A86 umieszcza w plikach .sym, co ułatwia proces debugowania.<BR>
+	Posiada pełną dokumentację. Pomoc w sprawie klawiszy jest w każdej chwili dostępna pod
+	kombinacją klawiszy Alt-F10.<BR>
+	Niestety, miałem problem z przeglądaniem aplikacji graficznej: po uruchomieniu trybu
+	graficznego nie mogłem wrócić do ekranu debuggera i musiałem poczekać, aż program się
+	zakończy. D86 zna instrukcje koprocesora.<BR>
+	Płatna wersja, D386, zna MMX, SSE i 3DNow!.
+	</P></LI>
+
+ <LI><span lang="en">Codeview</span> (CV) firmy <span lang="en">Microsoft</span>.
+	<P>Moje doświadczenie z tym debuggerem jest krótkie, gdyż nie spełnił on wszystkich moich
+	oczekiwań. Po uruchomieniu od razu trzeba otworzyć jakiś program (i z tego co pamiętam,
+	aby otworzyć inny program, trzeba wyjść z całego debuggera. Te programy, które
+	chciałem otworzyć, CV otwierał tak długo, że można było pomyśleć, że komputer się
+	zawiesił...<BR>
+	Nawet chyba nie jest rozprowadzany osobno, tylko razem z
+	<acronym title="Microsoft Macro asembler" lang="en">MASM</acronym>em (za darmo).
+	Trzeba przejść długi proces instalacji, ustawiać zmienne środowiska, ...
+	</P></LI>
+
+ <LI><span lang="en">Insight</span>
+	<P>Natrafiłem na niego, gdy szukałem czegoś (nowszego), co mogło by zastąpić Turbo
+	Debuggera. Wyglądem nawet przypomina TD, ale ma kilka wad. Pierwszą jest brak
+	rozpoznawania instrukcji koprocesora (wszystkie dekoduje jako ESC + coś tam). O MMX
+	nie ma co myśleć. Drugą wadą, którą znalazłem jest to, że po wejściu w tryb graficzny
+	okienko <q lang="en">Tryb MS-DOS</q> z debuggerem przestaje się odświeżać i
+	trzeba się przełączyć na pełny ekran.<BR>
+	Ale jako-tako, działa. Posiada opcje <span lang="en">step-over, trace-into, animate</span>.
+	Można zmieniać wartości rejestrów.
+	</P></LI>
+
+ <LI><span lang="en">Advanced Fullscreen Debugger</span>
+	<P>Nawet ładne narzędzie. Pozwala w jednej chwili oglądać kod, stos, rejestry i 2 bloki
+	pamięci (standardowo ustawiane na DS:0000). Obsługa jest prosta: na dole ekranu jest
+	pokazane, co robią klawisze funkcyjne, ale można też wpisywać komendy. Bardzo pomocne
+	jest to, że po wpisaniu pierwszej literki pojawiają się dostępne komendy zaczynające się
+	od niej. Niestety, ma te dwa problemy, które ma <span lang="en">Insight</span>: po uruchomieniu trybu
+	graficznego okienku z debuggerem przestaje być odświeżane (trzeba się przełączyć na
+	pełny ekran) i nie rozpoznaje instrukcji koprocesora.
+	</P></LI>
+
+  <LI>TRW2000
+	<P>Umie debugować programy typu .com i .exe. Jednak coś jest nie tak z obsługą myszy a
+	praca z nim nie jest zbyt wygodna.
+	Strona domowa TRW: <A HREF="http://www.hktk.com/soft/soft_tools/trw_1.html" hreflang="en"
+	>www.hktk.com/soft/soft_tools/trw_1.html</A>
+	</P></LI>
+</OL>
+
+<P>
+<a name="a_kurs0901" id="a_kurs0901">Debuggery programów dla <span lang="en">Windows</span></a>:</P>
+	<BR><a href="#a_kurs0902" class="bezdruk">(przeskocz <span lang="en">windows</span>owe debuggery)</a>
+<OL>
+ <LI>GoBug
+	<P>Część pakietu GoDevTools (<A HREF="http://www.godevtool.com/" hreflang="en">www.godevtool.com</a>).
+	Poza nim są m.in kompilator języka asembler oraz
+	<span lang="en">resource compiler</span>.
+	 Wszystko to przydać się może przy pisaniu programów dla <span lang="en">Windows</span>.
+	Ja osobiście używam
+	<acronym title="Flat asembler" lang="en">FASM</acronym>a,
+	 ale moim debuggerem jest właśnie <span lang="en">GoBug</span>.
+	 Ma miły dla oka
+	wygląd, zna rejestry
+	<acronym title="Floaing-Point Unit" lang="en">FPU</acronym>, MMX.
+	 Wyświetla kod programu, stan rejestrów, oraz stos
+	względem ESP oraz EBP. Obsługuje wieloprocesowość oraz symbole użyte w kodzie, o ile
+	znajdzie odpowiedni plik z nimi. Po przytrzymaniu prawego klawisza myszki na
+	instrukcji pojawiają się bajty zapisane szesnastkowo, które się na tę instrukcję
+	składają.<BR>
+	<span lang="en">GoBug</span> rozpoznaje uruchomienia procedur <span lang="en">Windows</span>-owych
+	 z bibliotek <acronym title="Dynamic Link Library" lang="en">DLL</acronym>.<BR>
+	Dobre narzędzie.
+	</P></LI>
+
+ <LI><span lang="en">Olly Debugger</span>
+	<P>Można go za darmo ściągnąć z jego strony domowej: <A HREF="http://ollydbg.de/" hreflang="en"
+	>ollydbg.de</A>. Wygląda bardziej <q>profesjonalnie</q> niż <span lang="en">GoBug</span> i
+	podobnie jak on, rozpoznaje uruchomienia procedur systemowych. Stos jest wyświetlany
+	tylko względem ESP. Wyświetla rejestry i flagi. Stara się łączyć umieszczanie parametrów
+	na stosie z uruchomieniem procedury, ale nie zawsze to wychodzi. Przewijając okienko z
+	kodem niektóre instrukcje mogą się nagle zmieniać. Obsługa jest według mnie trudniejsza.
+	Czcionka instrukcji jest mniejsza, co jeszcze bardziej utrudnia ich rozczytanie.
+	Bardziej nie wnikałem w jego obsługę.<BR>
+	W tej chwili bardziej polecam <span lang="en">GoBug</span> niż <span lang="en">OllyDbg</span>.
+	</P></LI>
+</OL>
+
+
+<P>
+<a name="a_kurs0902" id="a_kurs0902">Wiem, że nie wszyscy od razu z entuzjazmem</a> rzucą się do ściągania
+ i testowania przedstawionych wyżej programów i do debugowania własnych.<BR>
+Niektórzy mogą uważać, że
+debugger nie jest im potrzebny. Może i tak być, ale nie zawsze i nie u wszystkich. Czasem
+(zwykle po długim sterczeniu przed ekranem) przychodzi chęć do użycia czegoś, co tak
+bardzo może ułatwić nam wszystkim życie.<BR>
+Pomyślcie, że gdyby nie było debuggerów, znajdowanie błędów w programie musielibyśmy pozostawić
+naszej nie zawsze wyćwiczonej wyobraźni. Dlatego zachęcam Was do korzystania z programów tego
+typu (tylko tych posiadanych legalnie, oczywiście).
+</P>
+
+
+
+
+
+<BR><BR>
+<HR>
+<h2 class="nag"><a name="ide" id="ide">Środowiska programowania</a>, edytory i disasemblery/hex-edytory</h2>
+
+	<BR><a href="#make" class="bezdruk">(przeskocz ten dział)</a>
+
+<P>Środowisko programowania (<span lang="en">Integrated Development Environment</span>, IDE) to,
+ jak wszyscy wiemy,
+program, który umożliwia edycję kodu, jego kompilację i uruchamianie programu wynikowego.
+Znanych jest wiele IDE dla języków wysokiego poziomu, ale język asembler też ma kilka
+swoich:</P>
+	<BR><a href="#ide1" class="bezdruk">(przeskocz środowiska)</a>
+
+<UL>
+ <LI>RadASM - <A HREF="http://radasm.visualasembler.com/" hreflang="en"
+ 	>radasm.visualasembler.com</a> -
+ 	 środowisko programistyczne obsługujące wiele kompilatorów (MASM,
+ 	 <acronym title="Turbo Assembler">TASM</acronym>,
+ 	 <acronym title="Netwide asembler" lang="en">NASM</acronym>,
+ 	 <acronym title="High-Level asembler" lang="en">HLA</acronym>).
+
+  </LI>
+ <LI>NasmIDE: <A HREF="http://uk.geocities.com/rob_anderton/" hreflang="en">uk.geocities.com/rob_anderton</a>
+   </LI>
+ <LI>TasmIDE: <A HREF="http://creamelana.tripod.com/Tasm/TasmIDE.htm" hreflang="en"
+ 	>creamelana.tripod.com/Tasm/TasmIDE.htm</a>
+ <LI>Środowisko dla FASMa (wbudowane w kompilator w wersji GUI):
+	<A HREF="http://www.flatasembler.net" hreflang="en">flatasembler.net</A>
+	oraz Fresh:
+	<A HREF="http://fresh.flatasembler.net/" hreflang="en" lang="en">fresh.flatasembler.net</a>
+	</LI>
+
+ <LI>WinAsm Studio: <A HREF="http://code4u.net/winasm/" hreflang="en" lang="en">code4u.net/winasm</A></LI>
+
+ <LI>AsmEdit: <A HREF="http://asmedit.massmind.org/" hreflang="en">asmedit.massmind.org</a> (dla MASMa)
+	</LI>
+</UL>
+
+<P><a name="ide1" id="ide1">Jeśli mimo tego ktoś nie chce</a> lub nie lubi używać IDE,
+ zawsze może skorzystać z któregoś ze
+zwykłych edytorów. Przedstawione poniżej propozycje to co prawda nie muszą być edytorami
+napisanymi specjalnie do programowania w asemblerze, ale może coś Wam przypadnie do gustu:</P>
+
+	<BR><a href="#ide2" class="bezdruk">(przeskocz edytory)</a>
+<UL>
+ <LI><span lang="en">Programmer's File Editor</span>: <A HREF="http://www.movsd.com/tools.htm" hreflang="en"
+ 	>www.movsd.com/tools.htm</A></LI>
+ <LI><span lang="en">Quick Editor</span>: <A HREF="http://www.movsd.com/qed.htm" hreflang="en" lang="en">www.movsd.com/qed.htm</A></LI>
+ <LI><span lang="en">The Gun</span>: <A HREF="http://www.movsd.com/thegun.htm" hreflang="en" lang="en">www.movsd.com/thegun.htm</A></LI>
+ <LI>HTE: <A HREF="http://hte.sourceforge.net/" hreflang="en">hte.sf.net</A></LI>
+</UL>
+
+<P><a name="ide2" id="ide2">Jeśli nie podoba się Wam żaden</a> z wymienionych, to możecie wejść na stronę
+<A HREF="http://www.thefreecountry.com/programming/editors.shtml" hreflang="en"
+><span lang="en">The Free Country.com</span> - edytory</A>, gdzie przedstawionych jest
+wiele edytorów dla programistów.</P>
+
+<P>
+Kolejną przydatną rzeczą może okazać się disasembler lub hex-edytor. Jest to program, który
+podobnie jak debugger czyta plik i ewentualnie tłumaczy zawarte w nim bajty na instrukcje asemblera,
+jednak bez możliwości uruchomienia czytanego programu.<BR>
+Disasemblery mogą być przydatne w wielu sytuacjach, na przykład gdy chcemy modyfikować pojedyncze
+bajty po kompilacji programu, zobaczyć adresy zmiennych, itp.<BR>
+Oto kilka przykładów programów tego typu:</P>
+
+	<BR><a href="#make" class="bezdruk">(przeskocz hex-edytory)</a>
+<UL>
+ <LI>XEdit: <A HREF="http://www.ircdb.org" hreflang="en">www.ircdb.org</A></LI>
+ <LI>b2hedit: <A HREF="http://www.movsd.com/tools.htm" hreflang="en">www.movsd.com/tools.htm</A></LI>
+ <LI>Biew: <A HREF="http://biew.sourceforge.net/en/biew.html" hreflang="en">biew.sf.net</a>
+	</LI>
+</UL>
+
+<P>I ponownie, jeśli nie spodoba się Wam żaden z wymienionych, to możecie wejść na stronę
+<A HREF="http://www.thefreecountry.com/programming/disasemblers.shtml" hreflang="en"
+><span lang="en">The Free Country.com</span> - disasemblery</a>, aby poszukać wśród pokazanych
+tam programów czegoś dla siebie.</P>
+
+
+
+
+
+
+<HR>
+<h2 class="nag"><a name="make" id="make">Programy typu <span lang="en">MAKE</span></a></h2>
+
+<P>
+Programy typu <span lang="en">MAKE</span> (na przykład GNU MAKE) służą do automatyzacji budowania dużych
+ i małych projektów.
+Taki program działa dość prosto: uruchamiamy go, a on szuka pliku o nazwie <q lang="en">Makefile</q> w
+bieżącym katalogu i wykonuje komendy w nim zawarte. Teraz zajmiemy się omówieniem podstaw
+składni pliku <q lang="en">Makefile</q>.</P>
+<P>
+W pliku takim są zadania do wykonania. Nazwa zadania zaczyna się w pierwszej kolumnie, kończy
+dwukropkiem. Po dwukropku są podane nazwy zadań (lub plików) , od wykonania których zależy wykonanie
+tego zadania. W kolejnych wierszach są komendy służące do wykonania danego zadania.<BR>
+<em class="wazne">UWAGA:</em> komendy <em class="wazne">NIE MOGĄ</em>
+ zaczynać się od pierwszej kolumny!
+ Należy je pisać je po jednym tabulatorze (ale nie wolno zamiast tabulatora stawiać ośmiu spacji).<BR>
+Aby wykonać dane zadanie, wydajemy komendę <code><span lang="en">make</span> nazwa_zadania</code>.
+ Jeśli nie podamy nazwy zadania
+(co jest często spotykane), wykonywane jest zadanie o nazwie <q lang="en">all</q> (wszystko).</P>
+
+<P>A teraz krótki przykład:</P>
+	<BR><a href="#make1" class="bezdruk">(przeskocz przykład)</a>
+<PRE title="prosty Makefile">
+all:	kompilacja linkowanie
+	echo &quot;Wszystko zakonczone pomyslnie&quot;
+
+kompilacja:
+	nasm -O999 -f obj -o plik1.obj plik1.asm
+	nasm -O999 -f obj -o plik2.obj plik2.asm
+	nasm -O999 -f obj -o plik3.obj plik3.asm
+
+	tasm /z /m plik4.asm
+	tasm /z /m plik5.asm
+	tasm /z /m plik6.asm
+
+linkowanie: plik1.obj plik2.obj plik3.obj plik4.obj plik5.obj plik6.obj
+	alink -o wynik.exe plik1.obj plik2.obj plik3.obj plik4.obj \
+		 plik5.obj plik6.obj -c- -oEXE -m-
+
+help:
+	echo &quot;Wpisz make bez argumentow&quot;</PRE>
+
+<P><a name="make1" id="make1">Ale <span lang="en">MAKE</span> jest mądrzejszy</a>, niż może się to wydawać!<BR>
+Mianowicie, jeśli stwierdzi, że wynik.exe został stworzony PÓŹNIEJ niż pliki .obj podane w
+linii zależności, to nie wykona bloku <q>linkowanie</q>, bo nie ma to sensu skoro program wynikowy
+i tak jest aktualny. <span lang="en">MAKE</span> robi tylko to, co
+trzeba. Oczywiście, niezależnie od <q>wieku</q> plików .obj, dział <q>kompilacja</q> i tak zostanie
+wykonany (bo nie ma zależności, więc <span lang="en">MAKE</span> nie będzie sprawdzał wieku plików).
+</P>
+<P>Znak odwrotnego ukośnika <q>\</q> powoduje zrozumienie, że następna linia jest kontynuacją bieżącej,
+znak krzyżyka <q>#</q> powoduje traktowanie reszty linijki jako komentarza.</P>
+<P>
+Jeśli w czasie wykonywanie któregokolwiek z poleceń w bloku wystąpi błąd (ściśle mówiąc, to
+gdy błąd zwróci wykonywane polecenie, jak u nas TASM czy NASM), to <span lang="en">MAKE</span>
+ <em class="wazne">natychmiast przerywa
+działanie</em> z informacją o błędzie i nie wykona żadnych dalszych poleceń (pamiętajcie więc
+o umieszczeniu w zmiennej środowiskowej <span lang="en">PATH</span> ścieżki do kompilatorów).
+</P>
+<P>
+W powyższym pliku widać jeszcze jedno: zmiana nazwy któregoś z plików lub jakieś opcji sprawi,
+że trzeba ją będzie zmieniać wielokrotnie, w wielu miejscach pliku. Bardzo niewygodne w
+utrzymaniu, prawda?<BR>
+Na szczęście z pomocą przychodzą nam ... zmienne, które możemy deklarować w <q lang="en">Makefile</q>
+ i które zrozumie program <span lang="en">MAKE</span>.<BR>
+Składnia deklaracji zmiennej jest wyjątkowo prosta i wygląda tak:</P>
+<PRE>		NAZWA_ZMIENNEJ = wartosc</PRE>
+<P>A użycie:</P>
+<PRE>		$(NAZWA_ZMIENNEJ)</PRE>
+
+<P>Polecam nazwy zmiennych pisać wielkimi literami w celu odróżnienia ich od innych elementów. Pole
+wartości zmiennej może zawierać dowolny ciąg znaków.</P>
+<P>
+Jeśli chcemy, aby treść polecenia NIE pojawiała się na ekranie, do nazwy tego polecenia
+dopisujemy z przodu znak małpki <q>@</q>, na przykład</P>
+<PRE>		@echo &quot;Wszystko zakonczone pomyslnie&quot;</PRE>
+
+<P>Uzbrojeni w te informacje, przepisujemy nasz wcześniejszy <q lang="en">Makefile</q>:</P>
+	<BR><a href="#make2" class="bezdruk">(przeskocz drugi przykład)</a>
+<PRE title="bardziej rozbudowany Makefile">
+# Mój pierwszy Makefile
+
+NASM	    = nasm     # ale można tu w przyszłości wpisać pełną ścieżkę
+NASM_OPCJE  = -O999 -f obj
+
+TASM	    = tasm
+TASM_OPCJE  = /z /m
+
+ALINK	    = alink
+ALINK_OPCJE = -c- -oEXE -m-
+
+PLIKI_OBJ   = plik1.obj plik2.obj plik3.obj plik4.obj plik5.obj plik6.obj
+PROGRAM	    = wynik.exe
+
+all:	kompilacja linkowanie
+	@echo &quot;Wszystko zakonczone pomyslnie&quot;
+
+kompilacja:
+	$(NASM) $(NASM_OPCJE) -o plik1.obj plik1.asm
+	$(NASM) $(NASM_OPCJE) -o plik2.obj plik2.asm
+	$(NASM) $(NASM_OPCJE) -o plik3.obj plik3.asm
+
+	$(TASM) $(TASM_OPCJE) plik4.asm
+	$(TASM) $(TASM_OPCJE) plik5.asm
+	$(TASM) $(TASM_OPCJE) plik6.asm
+
+linkowanie:	$(PLIKI_OBJ)
+	$(ALINK) -o $(PROGRAM) $(PLIKI_OBJ) $(ALINK_OPCJE)
+
+help:
+	@echo &quot;Wpisz make bez argumentow&quot;</PRE>
+
+<P><a name="make2" id="make2">Oczywiście, w końcowym <q lang="en">Makefile</q></a> należy
+napisać takie regułki, które pozwolą na ewentualną kompilację pojedynczych plików, na przykład</P>
+<PRE title="regułki do kompilacji pojedynczych plików">
+plik1.obj:	plik1.asm plik1.inc
+	$(NASM) $(NASM_OPCJE) -o plik1.obj plik1.asm</PRE>
+<P>
+Choć na razie być może niepotrzebna, umiejętność pisania plików <q lang="en">Makefile</q>
+może się przydać już
+przy projektach zawierających tylko kilka modułów (bo nikt nigdy nie pamięta, które pliki są
+aktualne, a które nie).<BR>
+O tym, ile <q lang="en">Makefile</q> może zaoszczędzić czasu przekonałem się sam, pisząc swoją bibliotekę -
+kiedyś kompilowałem każdy moduł z osobna, teraz wydaję jedno jedyne polecenie <code lang="en">make</code> i
+wszystko się samo robi. <q lang="en">Makefile</q> z biblioteki jest spakowany razem z nią i możecie go sobie
+zobaczyć.
+</P>
+
+<br>
+<div class="bezdruk">
+<a accesskey="3" hreflang="pl" href="a_kurs08.htm">Poprzednia część kursu</a> (Alt+3)<BR>
+<a accesskey="4" hreflang="pl" href="a_kurs10.htm">Kolejna część kursu</a> (Alt+4)<br>
+<A accesskey="1" hreflang="pl" href="../index.htm">Spis treści off-<span lang="en">line</span></a> (Alt+1)<BR>
+<A accesskey="2" hreflang="pl" href="../index.php">Spis treści on-<span lang="en">line</span></a> (Alt+2)<br>
+<A accesskey="0" hreflang="pl" href="../ulatwie.htm">Ułatwienia dla niepełnosprawnych</a> (Alt+0)<BR>
+</div>
+
+
+</BODY></HTML>
